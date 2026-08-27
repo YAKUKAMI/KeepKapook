@@ -44,24 +44,33 @@ enum GoalStatus { active, completed }
 
 enum SaverMode { child, adult }
 
-enum TxType { deposit, unallocated, withdraw, transfer, adjust, slip }
+enum TxType {
+  deposit,
+  unallocated,
+  withdraw,
+  transfer,
+  allocate,
+  deallocate,
+  adjust,
+  slip,
+}
 
 enum TransactionFlow { externalIn, externalOut, internal, adjustment }
 
-TransactionFlow transactionFlowForType(TxType type) {
-  switch (type) {
-    case TxType.deposit:
-    case TxType.unallocated:
-    case TxType.slip:
-      return TransactionFlow.externalIn;
-    case TxType.withdraw:
-      return TransactionFlow.externalOut;
-    case TxType.transfer:
-      return TransactionFlow.internal;
-    case TxType.adjust:
-      return TransactionFlow.adjustment;
-  }
-}
+const Map<TxType, TransactionFlow> transactionFlowByType =
+    <TxType, TransactionFlow>{
+  TxType.deposit: TransactionFlow.externalIn,
+  TxType.unallocated: TransactionFlow.externalIn,
+  TxType.withdraw: TransactionFlow.externalOut,
+  TxType.transfer: TransactionFlow.internal,
+  TxType.allocate: TransactionFlow.internal,
+  TxType.deallocate: TransactionFlow.internal,
+  TxType.adjust: TransactionFlow.adjustment,
+  TxType.slip: TransactionFlow.externalIn,
+};
+
+TransactionFlow transactionFlowForType(TxType type) =>
+    transactionFlowByType[type]!;
 
 // รายรับ-รายจ่าย (แยกจากการออม)
 enum LedgerType { income, expense }
@@ -125,6 +134,7 @@ class Goal {
   DateTime? lockUntil;
   bool shared; // ออมด้วยกัน
   List<String> members;
+  int highestMilestonePercent;
 
   Goal({
     required this.id,
@@ -145,6 +155,7 @@ class Goal {
     this.lockUntil,
     this.shared = false,
     List<String>? members,
+    this.highestMilestonePercent = 0,
   }) : members = members ?? [] {
     if (flexible) {
       status = GoalStatus.active;
@@ -185,6 +196,7 @@ class Goal {
         'lockUntil': lockUntil?.toIso8601String(),
         'shared': shared,
         'members': members,
+        'highestMilestonePercent': highestMilestonePercent,
       };
 
   factory Goal.fromJson(Map<String, dynamic> j) => Goal(
@@ -219,6 +231,7 @@ class Goal {
         shared: _boolValue(j['shared'], false),
         members:
             (j['members'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        highestMilestonePercent: _intValue(j['highestMilestonePercent']),
       );
 }
 
@@ -245,7 +258,16 @@ class SavingTransaction {
     this.note = '',
     this.expAwarded = 0,
     this.isPossibleDuplicate = false,
-  }) : flow = flow ?? transactionFlowForType(type);
+  }) : flow = flow ?? transactionFlowForType(type) {
+    final expectedFlow = transactionFlowForType(type);
+    if (this.flow != expectedFlow) {
+      throw ArgumentError.value(
+        this.flow,
+        'flow',
+        'TxType.${type.name} ต้องใช้ flow ${expectedFlow.name}',
+      );
+    }
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,

@@ -35,6 +35,14 @@ void main() {
       TransactionFlow.internal,
     );
     expect(
+      transactionFlowForType(TxType.allocate),
+      TransactionFlow.internal,
+    );
+    expect(
+      transactionFlowForType(TxType.deallocate),
+      TransactionFlow.internal,
+    );
+    expect(
       transactionFlowForType(TxType.adjust),
       TransactionFlow.adjustment,
     );
@@ -69,12 +77,14 @@ void main() {
     expect(app.transactions.first.note, isEmpty);
 
     app.allocateUnallocated(400, destination.id);
+    expect(app.transactions.first.type, TxType.allocate);
     expect(app.transactions.first.flow, TransactionFlow.internal);
     expect(app.transactions.first.goalId, isNull);
     expect(app.transactions.first.destinationGoalId, destination.id);
     expect(app.transactions.first.note, isEmpty);
 
     app.withdrawFromGoal(source.id, 100);
+    expect(app.transactions.first.type, TxType.deallocate);
     expect(app.transactions.first.flow, TransactionFlow.internal);
     expect(app.transactions.first.goalId, source.id);
     expect(app.transactions.first.destinationGoalId, isNull);

@@ -18,10 +18,40 @@ class HistoryScreen extends StatelessWidget {
         return 'ถอนออก';
       case TxType.transfer:
         return 'โอนระหว่างกระปุก';
+      case TxType.allocate:
+        return 'จัดสรรเข้ากระปุก';
+      case TxType.deallocate:
+        return 'ย้ายกลับยอดยังไม่จัดสรร';
       case TxType.adjust:
         return 'ปรับยอด';
       case TxType.slip:
         return 'จากสลิป';
+    }
+  }
+
+  IconData _flowIcon(TransactionFlow flow) {
+    switch (flow) {
+      case TransactionFlow.externalIn:
+        return Icons.arrow_upward;
+      case TransactionFlow.externalOut:
+        return Icons.arrow_downward;
+      case TransactionFlow.internal:
+        return Icons.swap_horiz;
+      case TransactionFlow.adjustment:
+        return Icons.tune;
+    }
+  }
+
+  String _amountPrefix(TransactionFlow flow) {
+    switch (flow) {
+      case TransactionFlow.externalIn:
+        return '+';
+      case TransactionFlow.externalOut:
+        return '-';
+      case TransactionFlow.internal:
+        return '↔ ';
+      case TransactionFlow.adjustment:
+        return '±';
     }
   }
 
@@ -106,9 +136,7 @@ class HistoryScreen extends StatelessWidget {
                 leading: CircleAvatar(
                   backgroundColor: AppColors.mint.withValues(alpha: 0.15),
                   child: Icon(
-                    t.type == TxType.withdraw
-                        ? Icons.arrow_downward
-                        : Icons.arrow_upward,
+                    _flowIcon(t.flow),
                     color: AppColors.mint,
                     size: 18,
                   ),
@@ -126,7 +154,7 @@ class HistoryScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${t.type == TxType.withdraw ? '-' : '+'}${formatMoney(t.amountSatang)}',
+                      '${_amountPrefix(t.flow)}${formatMoney(t.amountSatang)}',
                       style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           color: AppColors.deepGreen),

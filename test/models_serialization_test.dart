@@ -38,6 +38,7 @@ void main() {
         lockUntil: at.add(const Duration(days: 7)),
         shared: true,
         members: ['นิด', 'หน่อย'],
+        highestMilestonePercent: 75,
       );
 
       expect(Goal.fromJson(model.toJson()).toJson(), model.toJson());
@@ -117,6 +118,7 @@ void main() {
     expect(() => AppUser.fromJson({}), returnsNormally);
 
     expect(Goal.fromJson({}).targetSatang, 0);
+    expect(Goal.fromJson({}).highestMilestonePercent, 0);
     expect(SavingTransaction.fromJson({}).amountSatang, 0);
     expect(
       SavingTransaction.fromJson({}).flow,

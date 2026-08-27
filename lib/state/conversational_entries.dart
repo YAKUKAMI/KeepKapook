@@ -258,14 +258,12 @@ extension ConversationalEntryActions on AppState {
             !_canSetGoalBalance(
               sourceGoal,
               sourceGoal.currentSatang - deltaSatang,
-            ) ||
-            unallocatedSatang + deltaSatang < 0) {
+            )) {
           return const HistoryMutationResult.failure(
-            'แก้รายการถอนนี้ไม่ได้ เพราะยอดที่เกี่ยวข้องไม่เพียงพอ',
+            'แก้รายการถอนนี้ไม่ได้ เพราะยอดกระปุกไม่เพียงพอ',
           );
         }
         sourceGoal.currentSatang -= deltaSatang;
-        unallocatedSatang += deltaSatang;
         break;
       case TxType.transfer:
         if (sourceGoal == null ||
@@ -285,6 +283,34 @@ extension ConversationalEntryActions on AppState {
         sourceGoal.currentSatang -= deltaSatang;
         destinationGoal.currentSatang += deltaSatang;
         break;
+      case TxType.allocate:
+        if (destinationGoal == null ||
+            !_canSetGoalBalance(
+              destinationGoal,
+              destinationGoal.currentSatang + deltaSatang,
+            ) ||
+            unallocatedSatang - deltaSatang < 0) {
+          return const HistoryMutationResult.failure(
+            'แก้รายการจัดสรรนี้ไม่ได้ เพราะยอดที่เกี่ยวข้องไม่เพียงพอ',
+          );
+        }
+        destinationGoal.currentSatang += deltaSatang;
+        unallocatedSatang -= deltaSatang;
+        break;
+      case TxType.deallocate:
+        if (sourceGoal == null ||
+            !_canSetGoalBalance(
+              sourceGoal,
+              sourceGoal.currentSatang - deltaSatang,
+            ) ||
+            unallocatedSatang + deltaSatang < 0) {
+          return const HistoryMutationResult.failure(
+            'แก้รายการย้ายกลับนี้ไม่ได้ เพราะยอดที่เกี่ยวข้องไม่เพียงพอ',
+          );
+        }
+        sourceGoal.currentSatang -= deltaSatang;
+        unallocatedSatang += deltaSatang;
+        break;
     }
     return const HistoryMutationResult.success();
   }
@@ -297,6 +323,7 @@ extension ConversationalEntryActions on AppState {
 
   void _refreshGoalStatuses(DateTime at) {
     for (final goal in goals) {
+      _recordReachedMilestone(goal);
       if (goal.flexible) {
         goal.status = GoalStatus.active;
         goal.completedDate = null;

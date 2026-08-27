@@ -42,6 +42,12 @@ void main() {
         amountSatang: 999,
         date: now,
       ),
+      SavingTransaction(
+        id: 'transfer',
+        type: TxType.transfer,
+        amountSatang: 999,
+        date: now,
+      ),
     ];
 
     expect(

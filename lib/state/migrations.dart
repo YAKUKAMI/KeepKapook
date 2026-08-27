@@ -1,7 +1,7 @@
 import '../models/models.dart';
 import '../utils/format.dart';
 
-const int currentSchemaVersion = 3;
+const int currentSchemaVersion = 4;
 
 typedef StateMigration = Map<String, dynamic> Function(
   Map<String, dynamic> state,
@@ -11,6 +11,7 @@ typedef StateMigration = Map<String, dynamic> Function(
 final Map<int, StateMigration> _migrationSteps = <int, StateMigration>{
   1: _migrateV1ToV2,
   2: _migrateV2ToV3,
+  3: _migrateV3ToV4,
 };
 
 Map<String, dynamic> _migrateV1ToV2(Map<String, dynamic> state) {
@@ -88,14 +89,144 @@ Map<String, dynamic> _migrateV2ToV3(Map<String, dynamic> state) {
           goalIdsByName,
         );
         break;
+      case TxType.allocate:
+        transaction['destinationGoalId'] = transaction['goalId'];
+        transaction['goalId'] = null;
+        break;
       case TxType.unallocated:
       case TxType.withdraw:
+      case TxType.deallocate:
         transaction['destinationGoalId'] = null;
         break;
     }
     return transaction;
   }).toList();
   return migrated;
+}
+
+Map<String, dynamic> _migrateV3ToV4(Map<String, dynamic> state) {
+  final migrated = Map<String, dynamic>.from(state);
+  final rawTransactions = state['transactions'];
+  if (rawTransactions != null && rawTransactions is! List) {
+    throw const FormatException('transactions ต้องเป็น JSON array');
+  }
+
+  final transactions =
+      (rawTransactions as List? ?? const <dynamic>[]).map((rawTransaction) {
+    if (rawTransaction is! Map) {
+      throw const FormatException('ข้อมูล transaction ต้องเป็น JSON object');
+    }
+    final transaction = Map<String, dynamic>.from(rawTransaction);
+    final legacyType = _legacyTransactionType(transaction['type']);
+    final flow = _legacyTransactionFlow(transaction['flow'], legacyType);
+    transaction['type'] = _canonicalTypeForFlow(legacyType, flow).name;
+    transaction['flow'] = flow.name;
+    return transaction;
+  }).toList();
+  migrated['transactions'] = transactions;
+
+  final highestMilestoneByGoal = <String, int>{};
+  for (final transaction in transactions) {
+    final destinationGoalId = transaction['destinationGoalId']?.toString();
+    if (destinationGoalId == null) continue;
+    final awarded = transaction['expAwarded'];
+    final highestFromExp =
+        _highestMilestoneFromLegacyExp(awarded is int ? awarded : 0);
+    final current = highestMilestoneByGoal[destinationGoalId] ?? 0;
+    if (highestFromExp > current) {
+      highestMilestoneByGoal[destinationGoalId] = highestFromExp;
+    }
+  }
+
+  final rawGoals = state['goals'];
+  if (rawGoals != null && rawGoals is! List) {
+    throw const FormatException('goals ต้องเป็น JSON array');
+  }
+  migrated['goals'] = (rawGoals as List? ?? const <dynamic>[]).map((rawGoal) {
+    if (rawGoal is! Map) {
+      throw const FormatException('ข้อมูล goal ต้องเป็น JSON object');
+    }
+    final goal = Map<String, dynamic>.from(rawGoal);
+    final id = goal['id']?.toString();
+    final fromBalance = _highestMilestoneFromGoalBalance(goal);
+    final fromTransactions = id == null ? 0 : highestMilestoneByGoal[id] ?? 0;
+    goal['highestMilestonePercent'] =
+        fromBalance > fromTransactions ? fromBalance : fromTransactions;
+    return goal;
+  }).toList();
+  return migrated;
+}
+
+TransactionFlow _legacyTransactionFlow(Object? value, TxType type) {
+  final name = value?.toString();
+  for (final flow in TransactionFlow.values) {
+    if (flow.name == name) return flow;
+  }
+  return transactionFlowForType(type);
+}
+
+TxType _canonicalTypeForFlow(TxType legacyType, TransactionFlow flow) {
+  switch (flow) {
+    case TransactionFlow.externalIn:
+      if (legacyType == TxType.deposit ||
+          legacyType == TxType.unallocated ||
+          legacyType == TxType.slip) {
+        return legacyType;
+      }
+      return TxType.deposit;
+    case TransactionFlow.externalOut:
+      return TxType.withdraw;
+    case TransactionFlow.internal:
+      if (legacyType == TxType.allocate || legacyType == TxType.deposit) {
+        return TxType.allocate;
+      }
+      if (legacyType == TxType.deallocate || legacyType == TxType.withdraw) {
+        return TxType.deallocate;
+      }
+      return TxType.transfer;
+    case TransactionFlow.adjustment:
+      return TxType.adjust;
+  }
+}
+
+int _highestMilestoneFromGoalBalance(Map<String, dynamic> goal) {
+  if (goal['flexible'] == true) return 0;
+  final currentSatang = goal['currentSatang'];
+  final targetSatang = goal['targetSatang'];
+  if (currentSatang is! int || targetSatang is! int || targetSatang <= 0) {
+    return 0;
+  }
+  var highest = 0;
+  for (final percent in const <int>[25, 50, 75, 100]) {
+    if (currentSatang * 100 >= targetSatang * percent) highest = percent;
+  }
+  return highest;
+}
+
+int _highestMilestoneFromLegacyExp(int expAwarded) {
+  if (expAwarded < 10) return 0;
+  final milestoneExp = expAwarded - 10;
+  const milestones = <(int, int)>[(25, 20), (50, 30), (75, 40), (100, 100)];
+  var highest = 0;
+
+  void search(int index, int total, int highestInSubset) {
+    if (index == milestones.length) {
+      if (total == milestoneExp && highestInSubset > highest) {
+        highest = highestInSubset;
+      }
+      return;
+    }
+    search(index + 1, total, highestInSubset);
+    final milestone = milestones[index];
+    search(
+      index + 1,
+      total + milestone.$2,
+      milestone.$1 > highestInSubset ? milestone.$1 : highestInSubset,
+    );
+  }
+
+  search(0, 0, 0);
+  return highest;
 }
 
 TxType _legacyTransactionType(Object? value) {

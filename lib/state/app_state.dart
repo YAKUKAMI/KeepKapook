@@ -329,10 +329,7 @@ class AppState extends ChangeNotifier {
       0,
       SavingTransaction(
         id: _uuid.v4(),
-        type: TxType.withdraw,
-        flow: toUnallocated
-            ? TransactionFlow.internal
-            : TransactionFlow.externalOut,
+        type: toUnallocated ? TxType.deallocate : TxType.withdraw,
         amountSatang: takeSatang,
         date: DateTime.now(),
         goalId: id,
@@ -369,13 +366,13 @@ class AppState extends ChangeNotifier {
       to.status = GoalStatus.completed;
       to.completedDate = DateTime.now();
     }
+    _recordReachedMilestone(to);
     final now = DateTime.now();
     transactions.insert(
       0,
       SavingTransaction(
         id: _uuid.v4(),
         type: TxType.transfer,
-        flow: TransactionFlow.internal,
         amountSatang: moveSatang,
         date: now,
         goalId: fromId,
@@ -450,6 +447,7 @@ class AppState extends ChangeNotifier {
       g.status = GoalStatus.completed;
       g.completedDate ??= DateTime.now();
     }
+    _recordReachedMilestone(g);
     _save();
     notifyListeners();
   }
@@ -471,6 +469,11 @@ class AppState extends ChangeNotifier {
   }) {
     final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
     final goal = goalId == null ? null : _requireGoal(goalId);
+    if (transactionFlowForType(source) != TransactionFlow.externalIn) {
+      throw DomainValidationException.operationNotAllowed(
+        'addSaving รองรับเฉพาะเงินเข้าจากภายนอก',
+      );
+    }
     return _addSaving(
       amountSatang: validatedAmountSatang,
       goal: goal,
@@ -487,75 +490,75 @@ class AppState extends ChangeNotifier {
     String note = '',
     DateTime? date,
     TxType source = TxType.deposit,
-    TransactionFlow? flow,
     required bool persist,
   }) {
     final now = (date ?? DateTime.now()).toUtc();
-    final transactionFlow = flow ?? transactionFlowForType(source);
-    int exp = 0;
+    final transactionFlow = transactionFlowForType(source);
+    var exp = transactionFlow == TransactionFlow.externalIn ? 10 : 0;
     int overflowSatang = 0;
     Goal? completed;
+    var recordedExp = false;
 
     if (goal != null) {
       final g = goal;
       final spaceSatang = g.flexible ? amountSatang : g.remainingSatang;
       final putSatang = amountSatang < spaceSatang ? amountSatang : spaceSatang;
       overflowSatang = amountSatang - putSatang;
-      final before = g.flexible ? 0.0 : g.progress;
       g.currentSatang += putSatang;
       if (g.flexible) {
         g.status = GoalStatus.active;
         g.completedDate = null;
       } else {
         final after = g.progress;
-        final milestones = {0.25: 20, 0.5: 30, 0.75: 40, 1.0: 100};
-        milestones.forEach((m, e) {
-          if (before < m && after >= m) exp += e;
-        });
+        if (transactionFlow == TransactionFlow.externalIn) {
+          exp += _awardNewMilestones(g);
+        } else {
+          _recordReachedMilestone(g);
+        }
         if (after >= 1.0) {
           g.status = GoalStatus.completed;
           g.completedDate = now;
           completed = g;
         }
       }
-      exp += 10; // base
-      transactions.insert(
-        0,
-        SavingTransaction(
-          id: _uuid.v4(),
-          type: source,
-          flow: transactionFlow,
-          amountSatang: putSatang,
-          date: now,
-          destinationGoalId: goal.id,
-          note: note,
-          expAwarded: exp,
-        ),
-      );
+      if (putSatang > 0) {
+        transactions.insert(
+          0,
+          SavingTransaction(
+            id: _uuid.v4(),
+            type: source,
+            amountSatang: putSatang,
+            date: now,
+            destinationGoalId: goal.id,
+            note: note,
+            expAwarded: exp,
+          ),
+        );
+        recordedExp = true;
+      }
     } else {
       overflowSatang = amountSatang;
     }
 
     if (overflowSatang > 0) {
       unallocatedSatang += overflowSatang;
-      transactions.insert(
-        0,
-        SavingTransaction(
-          id: _uuid.v4(),
-          type: TxType.unallocated,
-          flow: transactionFlow,
-          amountSatang: overflowSatang,
-          date: now,
-          note: note,
-        ),
-      );
+      if (transactionFlow == TransactionFlow.externalIn) {
+        transactions.insert(
+          0,
+          SavingTransaction(
+            id: _uuid.v4(),
+            type: TxType.unallocated,
+            amountSatang: overflowSatang,
+            date: now,
+            note: note,
+            expAwarded: recordedExp ? 0 : exp,
+          ),
+        );
+      }
     }
 
-    // quest: บันทึกเงินออม
-    for (final q in quests) {
-      if (q.id == 'q-deposit' && !q.claimed && goal != null) {
-        q.progress = (q.progress + 1).clamp(0, q.target);
-      }
+    if (transactionFlow == TransactionFlow.externalIn) {
+      _progressQuest('q-deposit');
     }
 
     user.exp += exp;
@@ -578,9 +581,45 @@ class AppState extends ChangeNotifier {
     _addSaving(
       amountSatang: allocatedSatang,
       goal: goal,
-      flow: TransactionFlow.internal,
-      persist: true,
+      source: TxType.allocate,
+      persist: false,
     ); // overflow กลับเข้า pool เอง
+    _progressQuest('q-allocate');
+    _saveAndNotify();
+  }
+
+  void _progressQuest(String id) {
+    final quest = quests.where((entry) => entry.id == id).firstOrNull;
+    if (quest == null || quest.claimed) return;
+    quest.progress = (quest.progress + 1).clamp(0, quest.target);
+  }
+
+  int _awardNewMilestones(Goal goal) {
+    final before = goal.highestMilestonePercent;
+    _recordReachedMilestone(goal);
+    var exp = 0;
+    for (final milestone in const <(int, int)>[
+      (25, 20),
+      (50, 30),
+      (75, 40),
+      (100, 100),
+    ]) {
+      if (milestone.$1 > before &&
+          milestone.$1 <= goal.highestMilestonePercent) {
+        exp += milestone.$2;
+      }
+    }
+    return exp;
+  }
+
+  void _recordReachedMilestone(Goal goal) {
+    if (!goal.hasSavingsTarget) return;
+    for (final percent in const <int>[25, 50, 75, 100]) {
+      if (goal.currentSatang * 100 >= goal.targetSatang * percent &&
+          percent > goal.highestMilestonePercent) {
+        goal.highestMilestonePercent = percent;
+      }
+    }
   }
 
   int claimQuest(String id) {

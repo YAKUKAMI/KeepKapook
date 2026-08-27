@@ -113,7 +113,7 @@ List<DailySavingTotal> summarizeSevenDaySavings(
     final totalSatang = transactions
         .where(
           (transaction) =>
-              transaction.type != TxType.withdraw &&
+              transaction.flow == TransactionFlow.externalIn &&
               transaction.date.year == day.year &&
               transaction.date.month == day.month &&
               transaction.date.day == day.day,

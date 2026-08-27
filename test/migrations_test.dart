@@ -32,7 +32,7 @@ void main() {
     );
   });
 
-  test('v1 → v3 แปลงเงินบาทและ migrate transaction ต่อขั้น', () {
+  test('v1 → v4 แปลงเงินบาทและ migrate transaction ต่อขั้น', () {
     final raw = <String, dynamic>{
       'schemaVersion': 1,
       'goals': <dynamic>[
@@ -96,7 +96,7 @@ void main() {
     Map<String, dynamic> transaction(String id) =>
         transactions.singleWhere((entry) => entry['id'] == id);
 
-    expect(migrated['schemaVersion'], 3);
+    expect(migrated['schemaVersion'], currentSchemaVersion);
     expect(transaction('unique-match')['destinationGoalId'], 'unique');
     expect(transaction('duplicate-name')['destinationGoalId'], isNull);
     expect(transaction('not-found')['destinationGoalId'], isNull);
@@ -153,6 +153,66 @@ void main() {
     expect(entries['adjust']!['destinationGoalId'], 'destination');
     expect(entries['slip']!['flow'], 'externalIn');
     expect(entries['slip']!['destinationGoalId'], 'destination');
+  });
+
+  test('v3 → v4 canonicalize type/flow และจำ milestone โดยไม่หัก EXP เดิม', () {
+    final raw = <String, dynamic>{
+      'schemaVersion': 3,
+      'user': <String, dynamic>{'exp': 777},
+      'goals': <dynamic>[
+        <String, dynamic>{
+          ..._v2Goal('goal', 'เป้าหมาย'),
+          'targetSatang': 10000,
+          'currentSatang': 1000,
+        },
+      ],
+      'transactions': <dynamic>[
+        <String, dynamic>{
+          ..._v2Transaction(
+            'milestone',
+            'deposit',
+            goalId: null,
+          ),
+          'flow': 'externalIn',
+          'destinationGoalId': 'goal',
+          'expAwarded': 30,
+        },
+        <String, dynamic>{
+          ..._v2Transaction(
+            'legacy-allocate',
+            'deposit',
+            goalId: null,
+          ),
+          'flow': 'internal',
+          'destinationGoalId': 'goal',
+          'expAwarded': 10,
+        },
+        <String, dynamic>{
+          ..._v2Transaction(
+            'legacy-deallocate',
+            'withdraw',
+            goalId: 'goal',
+          ),
+          'flow': 'internal',
+          'destinationGoalId': null,
+          'expAwarded': 0,
+        },
+      ],
+    };
+
+    final migrated = migrateState(raw, 3);
+    final entries = <String, Map<String, dynamic>>{
+      for (final entry in (migrated['transactions'] as List))
+        (entry as Map<String, dynamic>)['id'] as String: entry,
+    };
+    final goal = (migrated['goals'] as List).single as Map<String, dynamic>;
+
+    expect(migrated['schemaVersion'], 4);
+    expect((migrated['user'] as Map<String, dynamic>)['exp'], 777);
+    expect(entries['milestone']!['type'], 'deposit');
+    expect(entries['legacy-allocate']!['type'], 'allocate');
+    expect(entries['legacy-deallocate']!['type'], 'deallocate');
+    expect(goal['highestMilestonePercent'], 25);
   });
 }
 

@@ -23,7 +23,7 @@ void main() {
     expect(AppState().toJson()['schemaVersion'], currentSchemaVersion);
   });
 
-  test('ข้อมูล v1 ที่ไม่มี schemaVersion โหลดได้ ยอดตรง และถูกเขียนเป็น v3',
+  test('ข้อมูล v1 ที่ไม่มี schemaVersion โหลดได้ ยอดตรง และถูกเขียนเป็น v4',
       () async {
     final oldJson = jsonEncode(<String, dynamic>{
       'user': <String, dynamic>{'name': 'ผู้ใช้เดิม'},

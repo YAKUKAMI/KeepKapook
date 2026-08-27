@@ -96,9 +96,9 @@ int averageDepositPerDaySatang(
   DateTime? now,
 }) {
   final depositedSatang = transactions
-      .where((transaction) =>
-          transaction.type != TxType.withdraw &&
-          transaction.type != TxType.adjust)
+      .where(
+        (transaction) => transaction.flow == TransactionFlow.externalIn,
+      )
       .fold<int>(
         0,
         (sum, transaction) => sum + transaction.amountSatang,

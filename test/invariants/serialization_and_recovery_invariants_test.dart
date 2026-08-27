@@ -33,6 +33,7 @@ void main() {
       lockUntil: invariantTime.add(const Duration(days: 7)),
       shared: true,
       members: <String>['เมย์'],
+      highestMilestonePercent: 50,
     );
     final transaction = SavingTransaction(
       id: 'tx',
