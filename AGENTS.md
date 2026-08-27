@@ -207,7 +207,12 @@ flutter build apk --release  # Android SDK ติดตั้งแล้ว; AP
 
 ### State
 - ทุก action ที่แก้ state ต้องจบด้วย `_save()` + `notifyListeners()`
-- สถานะปัจจุบันของ `_save()`: **ยังไม่มี debounce และไม่มี try/catch/error reporting** โดยเรียก `SharedPreferences.getInstance()` แล้ว `setString()` ตรงๆ
+- **Validation failure ใช้ `DomainValidationException` แบบเดียวกันทั้งโปรเจกต์** — จำนวนเงินผิด, id ไม่มี, หรือโอนเข้าตัวเองต้อง throw ก่อนแตะ state; ห้าม return เงียบหรือใช้ Result แทน validation error
+- Result object ใช้ได้เฉพาะผลลัพธ์ของ input ที่ valid แล้วหรือ business conflict ที่คาดว่าจะเกิดได้ (เช่น แก้ประวัติไม่ได้เพราะยอดถูกใช้ไป) ไม่ใช้แทน input validation
+- money action boundary รับ `num` เพื่อให้ domain ตรวจ `NaN`/infinity ได้เอง แต่ค่าที่ผ่านต้องเป็น `int` หน่วยสตางค์, `> 0` และไม่เกิน `maxMoneyInputSatang`
+- ทุก action ต้อง **validate ให้ครบก่อน แล้วค่อย apply state**; ถ้าต้องแก้หลาย field ให้แยกช่วง validate/preflight ออกจาก apply ห้าม rollback หลังเขียนบางส่วนเป็นกลไกหลัก
+- UI validation ต้องคงไว้เพื่อ UX; domain validation เป็นชั้นบังคับความถูกต้องและห้ามพึ่ง UI เพียงชั้นเดียว
+- สถานะปัจจุบันของ `_save()`: debounce 300ms, snapshot ตอน mutation, เขียนผ่าน ordered queue และรายงาน failure ด้วย `MaterialBanner`; mutation แจ้ง UI ได้ทันทีเพราะคิวรับประกันว่า snapshot เก่าจะไม่เขียนทับ snapshot ใหม่
 - ระวัง null-promotion ใน closure (ใช้ `x!` หรือแยกเป็น method)
 - Business logic อยู่ใน `utils/` หรือ `AppState` เท่านั้น — หน้าจอห้ามคำนวณเงิน/วัน/EXP เอง (ไม่งั้นเทสไม่ได้)
 

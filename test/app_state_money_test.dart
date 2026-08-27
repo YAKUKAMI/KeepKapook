@@ -72,11 +72,15 @@ void main() {
   test('AppState ปฏิเสธยอดออมศูนย์และค่าติดลบโดยไม่แก้ state', () {
     final app = AppState()..unallocatedSatang = 10;
 
-    final zero = app.addSaving(amountSatang: 0, date: at);
-    final negative = app.addSaving(amountSatang: -1, date: at);
+    expect(
+      () => app.addSaving(amountSatang: 0, date: at),
+      throwsA(isA<DomainValidationException>()),
+    );
+    expect(
+      () => app.addSaving(amountSatang: -1, date: at),
+      throwsA(isA<DomainValidationException>()),
+    );
 
-    expect(zero.overflowSatang, 0);
-    expect(negative.overflowSatang, 0);
     expect(app.unallocatedSatang, 10);
     expect(app.transactions, isEmpty);
   });
@@ -84,13 +88,14 @@ void main() {
   test('AppState ปฏิเสธยอดออมที่เกินเพดานโดยไม่แก้ state', () {
     final app = AppState();
 
-    final result = app.addSaving(
-      amountSatang: 10000000001,
-      date: at,
+    expect(
+      () => app.addSaving(
+        amountSatang: 10000000001,
+        date: at,
+      ),
+      throwsA(isA<DomainValidationException>()),
     );
 
-    expect(result.exp, 0);
-    expect(result.overflowSatang, 0);
     expect(app.transactions, isEmpty);
     expect(app.unallocatedSatang, 0);
   });

@@ -32,10 +32,27 @@ List<String> _invalidAmountViolations({
       thrown = error;
     }
     final after = invariantStateJson(app);
-    if (thrown == null) violations.add('${invalid.label}: did not throw');
+    if (thrown == null) {
+      violations.add('${invalid.label}: did not throw');
+    } else if (thrown is! DomainValidationException) {
+      violations.add(
+        '${invalid.label}: threw ${thrown.runtimeType}, expected '
+        'DomainValidationException',
+      );
+    }
     if (after != before) violations.add('${invalid.label}: state changed');
   }
   return violations;
+}
+
+void _expectDomainFailureAtomically(
+  AppState app,
+  void Function() action,
+) {
+  final before = invariantStateJson(app);
+
+  expect(action, throwsA(isA<DomainValidationException>()));
+  expect(invariantStateJson(app), before);
 }
 
 void main() {
@@ -59,6 +76,16 @@ void main() {
     );
 
     expect(violations, isEmpty);
+
+    final app = AppState();
+    _expectDomainFailureAtomically(
+      app,
+      () => app.addSaving(
+        amountSatang: 1,
+        goalId: 'missing-goal',
+        date: invariantTime,
+      ),
+    );
   });
 
   test('I5 addGoal rejects every invalid amount atomically', () {
@@ -109,6 +136,33 @@ void main() {
     );
 
     expect(violations, isEmpty);
+
+    final app = AppState()
+      ..goals = <Goal>[
+        invariantGoal(
+          id: 'source',
+          name: 'ต้นทาง',
+          targetSatang: 1000,
+          currentSatang: 500,
+        ),
+        invariantGoal(
+          id: 'destination',
+          name: 'ปลายทาง',
+          targetSatang: 1000,
+        ),
+      ];
+    _expectDomainFailureAtomically(
+      app,
+      () => app.transfer('source', 'source', 100),
+    );
+    _expectDomainFailureAtomically(
+      app,
+      () => app.transfer('missing-goal', 'destination', 100),
+    );
+    _expectDomainFailureAtomically(
+      app,
+      () => app.transfer('source', 'missing-goal', 100),
+    );
   });
 
   test('I5 allocate rejects every invalid amount atomically', () {
@@ -127,6 +181,12 @@ void main() {
     );
 
     expect(violations, isEmpty);
+
+    final app = AppState()..unallocatedSatang = 100;
+    _expectDomainFailureAtomically(
+      app,
+      () => app.allocateUnallocated(100, 'missing-goal'),
+    );
   });
 
   test('I5 withdraw rejects every invalid amount atomically', () {
@@ -145,5 +205,15 @@ void main() {
     );
 
     expect(violations, isEmpty);
+
+    final app = AppState();
+    _expectDomainFailureAtomically(
+      app,
+      () => app.withdrawFromGoal('missing-goal', 100),
+    );
+    _expectDomainFailureAtomically(
+      app,
+      () => app.setLock('missing-goal', invariantTime),
+    );
   });
 }

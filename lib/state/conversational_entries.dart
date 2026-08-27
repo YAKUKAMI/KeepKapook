@@ -33,7 +33,22 @@ extension ConversationalEntryActions on AppState {
     String? goalId,
   }) {
     if (items.isEmpty) {
-      throw ArgumentError.value(items, 'items', 'ต้องมีอย่างน้อยหนึ่งรายการ');
+      throw DomainValidationException.operationNotAllowed(
+        'ต้องมีอย่างน้อยหนึ่งรายการ',
+      );
+    }
+    for (final item in items) {
+      validateMoneyAmountSatang(item.amountSatang);
+    }
+    final hasGoalDeposit =
+        items.any((item) => item.type == ParsedEntryType.goalDeposit);
+    final destinationGoal = hasGoalDeposit
+        ? goalId == null
+            ? throw DomainValidationException.missingGoal('ไม่ได้ระบุ')
+            : _requireGoal(goalId)
+        : null;
+    if (!hasGoalDeposit && goalId != null) {
+      _requireGoal(goalId);
     }
 
     final beforeState = toJson();
@@ -44,23 +59,13 @@ extension ConversationalEntryActions on AppState {
 
     try {
       for (final item in items) {
-        if (item.amountSatang <= 0 || item.amountSatang > maxMoneyInputSatang) {
-          throw ArgumentError.value(
-            item.amountSatang,
-            'amountSatang',
-            'จำนวนเงินไม่ถูกต้อง',
-          );
-        }
         totalAmountSatang += item.amountSatang;
 
         if (item.type == ParsedEntryType.goalDeposit) {
-          if (goalId == null || !goals.any((goal) => goal.id == goalId)) {
-            throw StateError('ต้องเลือกกระปุกก่อนบันทึกเงินออม');
-          }
           final existingIds = transactions.map((tx) => tx.id).toSet();
           _addSaving(
             amountSatang: item.amountSatang,
-            goalId: goalId,
+            goal: destinationGoal,
             note: item.description,
             date: item.date.toUtc(),
             persist: false,
@@ -116,18 +121,20 @@ extension ConversationalEntryActions on AppState {
   bool updateLedgerEntry({
     required String id,
     required LedgerType type,
-    required int amountSatang,
+    required num amountSatang,
     required String category,
     required String note,
     required DateTime date,
   }) {
-    if (amountSatang <= 0 || amountSatang > maxMoneyInputSatang) return false;
+    final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
     final index = ledger.indexWhere((entry) => entry.id == id);
-    if (index < 0) return false;
+    if (index < 0) {
+      throw DomainValidationException.missingEntity('รายการบัญชี', id);
+    }
     final entry = ledger[index];
     entry
       ..type = type
-      ..amountSatang = amountSatang
+      ..amountSatang = validatedAmountSatang
       ..category = category
       ..note = note
       ..date = date.toUtc();
@@ -137,7 +144,9 @@ extension ConversationalEntryActions on AppState {
 
   bool updateLedgerCategory(String id, String category) {
     final index = ledger.indexWhere((entry) => entry.id == id);
-    if (index < 0) return false;
+    if (index < 0) {
+      throw DomainValidationException.missingEntity('รายการบัญชี', id);
+    }
     ledger[index].category = category;
     _saveAndNotify();
     return true;
@@ -145,7 +154,9 @@ extension ConversationalEntryActions on AppState {
 
   bool updateLedgerDate(String id, DateTime date) {
     final index = ledger.indexWhere((entry) => entry.id == id);
-    if (index < 0) return false;
+    if (index < 0) {
+      throw DomainValidationException.missingEntity('รายการบัญชี', id);
+    }
     ledger[index].date = date.toUtc();
     _saveAndNotify();
     return true;
@@ -153,24 +164,22 @@ extension ConversationalEntryActions on AppState {
 
   HistoryMutationResult updateSavingTransaction({
     required String id,
-    required int amountSatang,
+    required num amountSatang,
     required String note,
     required DateTime date,
   }) {
-    if (amountSatang <= 0 || amountSatang > maxMoneyInputSatang) {
-      return const HistoryMutationResult.failure('จำนวนเงินไม่ถูกต้อง');
-    }
+    final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
     final index = transactions.indexWhere((tx) => tx.id == id);
     if (index < 0) {
-      return const HistoryMutationResult.failure('ไม่พบรายการที่ต้องการแก้ไข');
+      throw DomainValidationException.missingEntity('ประวัติเงินออม', id);
     }
     final transaction = transactions[index];
-    final deltaSatang = amountSatang - transaction.amountSatang;
+    final deltaSatang = validatedAmountSatang - transaction.amountSatang;
     final adjustment = _applyTransactionDelta(transaction, deltaSatang);
     if (!adjustment.success) return adjustment;
 
     transaction
-      ..amountSatang = amountSatang
+      ..amountSatang = validatedAmountSatang
       ..note = note
       ..date = date.toUtc();
     _refreshGoalStatuses(date.toUtc());
@@ -181,7 +190,7 @@ extension ConversationalEntryActions on AppState {
   HistoryMutationResult deleteSavingTransaction(String id) {
     final index = transactions.indexWhere((tx) => tx.id == id);
     if (index < 0) {
-      return const HistoryMutationResult.failure('ไม่พบรายการที่ต้องการลบ');
+      throw DomainValidationException.missingEntity('ประวัติเงินออม', id);
     }
     final transaction = transactions[index];
     final adjustment = _applyTransactionDelta(

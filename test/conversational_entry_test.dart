@@ -98,6 +98,7 @@ void main() {
     expect(app.user.exp, 7);
     expect(app.quests.single.progress, 0);
     expect(app.badges.single.unlocked, isFalse);
+    await app.flushPendingSaves();
   });
 
   testWidgets('low ถามหนึ่งคำถามและไม่สร้างรายการ', (tester) async {
@@ -160,6 +161,7 @@ void main() {
     await tester.pump();
 
     expect(app.ledger.single.category, 'อาหาร');
+    await app.flushPendingSaves();
   });
 
   testWidgets('medium ที่วันที่ไม่ชัดแสดง chip วันที่ให้แก้ในบรรทัดเดิม',
@@ -178,6 +180,7 @@ void main() {
     expect(app.ledger, hasLength(1));
     expect(find.byKey(const Key('editable_date_chip')), findsOneWidget);
     expect(find.byKey(const Key('editable_category_chip')), findsNothing);
+    await app.flushPendingSaves();
   });
 
   testWidgets('FAB เปิดช่องพิมพ์ได้โดยไม่เปลี่ยนแท็บ', (tester) async {

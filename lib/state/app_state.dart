@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,7 +7,10 @@ import '../models/models.dart';
 import '../utils/format.dart';
 import '../utils/parser/parser.dart';
 import 'backup.dart';
+import 'domain_validation.dart';
 import 'migrations.dart';
+
+export 'domain_validation.dart';
 
 part 'conversational_entries.dart';
 
@@ -39,6 +43,17 @@ class SavingResult {
 }
 
 class AppState extends ChangeNotifier {
+  AppState({Future<bool> Function(String raw)? stateWriter})
+      : _stateWriter = stateWriter;
+
+  static const Duration _saveDebounceDuration = Duration(milliseconds: 300);
+
+  final Future<bool> Function(String raw)? _stateWriter;
+  Timer? _saveDebounce;
+  Future<void> _saveQueue = Future<void>.value();
+  String? _pendingSaveSnapshot;
+  bool _disposed = false;
+
   AppUser user = AppUser();
   List<Goal> goals = [];
   List<SavingTransaction> transactions = [];
@@ -118,9 +133,43 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(appStateStorageKey, jsonEncode(toJson()));
+  void _save() {
+    _pendingSaveSnapshot = jsonEncode(toJson());
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(_saveDebounceDuration, _enqueuePendingSave);
+  }
+
+  void _enqueuePendingSave() {
+    final snapshot = _pendingSaveSnapshot;
+    if (snapshot == null) return;
+    _pendingSaveSnapshot = null;
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
+    _saveQueue = _saveQueue.then((_) => _writeSnapshot(snapshot));
+  }
+
+  Future<void> _writeSnapshot(String snapshot) async {
+    try {
+      final writer = _stateWriter;
+      final saved = writer != null
+          ? await writer(snapshot)
+          : await (await SharedPreferences.getInstance()).setString(
+              appStateStorageKey,
+              snapshot,
+            );
+      if (!saved) throw StateError('SharedPreferences ปฏิเสธการเขียนข้อมูล');
+    } catch (_) {
+      loadErrorMessage =
+          'บันทึกข้อมูลล่าสุดไม่สำเร็จ กรุณาอย่าปิดแอปและลองทำรายการอีกครั้ง';
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  /// รอให้ snapshot ล่าสุดเขียนเสร็จ ใช้ก่อน side effect ที่ต้องเห็น state ล่าสุด
+  /// และใช้เป็น test seam ของ debounce/ordered queue
+  Future<void> flushPendingSaves() async {
+    _enqueuePendingSave();
+    await _saveQueue;
   }
 
   void _saveAndNotify() {
@@ -129,6 +178,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> restoreBackup(BackupPreview backup) async {
+    await flushPendingSaves();
     final prefs = await SharedPreferences.getInstance();
     final currentState = toJson();
     final currentRaw = jsonEncode(currentState);
@@ -175,20 +225,27 @@ class AppState extends ChangeNotifier {
     unallocatedSatang = j['unallocatedSatang'] as int? ?? 0;
   }
 
+  @override
+  void dispose() {
+    _enqueuePendingSave();
+    _disposed = true;
+    super.dispose();
+  }
+
   // ---------- ledger (รายรับ-รายจ่าย) ----------
   void addLedger(
     LedgerType type,
-    int amountSatang,
+    num amountSatang,
     String category,
     String note,
   ) {
-    if (amountSatang <= 0 || amountSatang > maxMoneyInputSatang) return;
+    final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
     ledger.insert(
       0,
       LedgerEntry(
         id: _uuid.v4(),
         type: type,
-        amountSatang: amountSatang,
+        amountSatang: validatedAmountSatang,
         category: category,
         note: note,
         date: DateTime.now().toUtc(),
@@ -199,7 +256,11 @@ class AppState extends ChangeNotifier {
   }
 
   void deleteLedger(String id) {
-    ledger.removeWhere((e) => e.id == id);
+    final index = ledger.indexWhere((entry) => entry.id == id);
+    if (index < 0) {
+      throw DomainValidationException.missingEntity('รายการบัญชี', id);
+    }
+    ledger.removeAt(index);
     _save();
     notifyListeners();
   }
@@ -218,6 +279,15 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------- pocket / transfer / lock / shared ----------
+  Goal? _goalById(String id) =>
+      goals.where((goal) => goal.id == id).firstOrNull;
+
+  Goal _requireGoal(String id) {
+    final goal = _goalById(id);
+    if (goal == null) throw DomainValidationException.missingGoal(id);
+    return goal;
+  }
+
   Goal createPocket({
     required String name,
     String emoji = '👛',
@@ -241,13 +311,15 @@ class AppState extends ChangeNotifier {
 
   void withdrawFromGoal(
     String id,
-    int amountSatang, {
+    num amountSatang, {
     bool toUnallocated = true,
   }) {
-    final g = goals.firstWhere((x) => x.id == id);
+    final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
+    final g = _requireGoal(id);
     if (g.isLockedNow) return;
-    final takeSatang =
-        amountSatang > g.currentSatang ? g.currentSatang : amountSatang;
+    final takeSatang = validatedAmountSatang > g.currentSatang
+        ? g.currentSatang
+        : validatedAmountSatang;
     if (takeSatang <= 0) return;
     g.currentSatang -= takeSatang;
     if (g.status == GoalStatus.completed && g.currentSatang < g.targetSatang) {
@@ -270,13 +342,17 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void transfer(String fromId, String toId, int amountSatang) {
-    if (fromId == toId || amountSatang <= 0) return;
-    final from = goals.firstWhere((x) => x.id == fromId);
-    final to = goals.firstWhere((x) => x.id == toId);
+  void transfer(String fromId, String toId, num amountSatang) {
+    final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
+    if (fromId == toId) {
+      throw DomainValidationException.sameGoalTransfer();
+    }
+    final from = _requireGoal(fromId);
+    final to = _requireGoal(toId);
     if (from.isLockedNow) return;
-    var moveSatang =
-        amountSatang > from.currentSatang ? from.currentSatang : amountSatang;
+    var moveSatang = validatedAmountSatang > from.currentSatang
+        ? from.currentSatang
+        : validatedAmountSatang;
     final spaceSatang = to.flexible ? moveSatang : to.remainingSatang;
     moveSatang = moveSatang > spaceSatang ? spaceSatang : moveSatang;
     if (moveSatang <= 0) return;
@@ -303,7 +379,7 @@ class AppState extends ChangeNotifier {
   }
 
   void setLock(String id, DateTime? until) {
-    final g = goals.firstWhere((x) => x.id == id);
+    final g = _requireGoal(id);
     g.locked = until != null;
     g.lockUntil = until;
     _save();
@@ -311,7 +387,7 @@ class AppState extends ChangeNotifier {
   }
 
   void toggleShared(String id, bool shared, List<String> members) {
-    final g = goals.firstWhere((x) => x.id == id);
+    final g = _requireGoal(id);
     g.shared = shared;
     g.members = members;
     _save();
@@ -331,16 +407,20 @@ class AppState extends ChangeNotifier {
   // ---------- actions ----------
   Goal addGoal({
     required String name,
-    required int targetSatang,
+    required num targetSatang,
     required DateTime targetDate,
     String emoji = '🎯',
     GoalCategory category = GoalCategory.other,
     int themeColor = 0xFF52C7A5,
   }) {
+    final validatedTargetSatang = validateMoneyAmountSatang(
+      targetSatang,
+      fieldName: 'targetSatang',
+    );
     final g = Goal(
       id: 'g-${_uuid.v4()}',
       name: name,
-      targetSatang: targetSatang,
+      targetSatang: validatedTargetSatang,
       startDate: DateTime.now(),
       targetDate: targetDate,
       emoji: emoji,
@@ -354,6 +434,7 @@ class AppState extends ChangeNotifier {
   }
 
   void updateGoal(Goal g) {
+    _requireGoal(g.id);
     if (g.currentSatang >= g.targetSatang) {
       g.status = GoalStatus.completed;
       g.completedDate ??= DateTime.now();
@@ -363,46 +444,47 @@ class AppState extends ChangeNotifier {
   }
 
   void deleteGoal(String id) {
-    goals.removeWhere((g) => g.id == id);
+    final goal = _requireGoal(id);
+    goals.remove(goal);
     _save();
     notifyListeners();
   }
 
   /// เพิ่มเงินออม เข้ากระปุกเดียว หรือ (goalId == null) เข้ายังไม่จัดสรร
   SavingResult addSaving({
-    required int amountSatang,
+    required num amountSatang,
     String? goalId,
     String note = '',
     DateTime? date,
     TxType source = TxType.deposit,
-  }) =>
-      _addSaving(
-        amountSatang: amountSatang,
-        goalId: goalId,
-        note: note,
-        date: date,
-        source: source,
-        persist: true,
-      );
+  }) {
+    final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
+    final goal = goalId == null ? null : _requireGoal(goalId);
+    return _addSaving(
+      amountSatang: validatedAmountSatang,
+      goal: goal,
+      note: note,
+      date: date,
+      source: source,
+      persist: true,
+    );
+  }
 
   SavingResult _addSaving({
     required int amountSatang,
-    String? goalId,
+    required Goal? goal,
     String note = '',
     DateTime? date,
     TxType source = TxType.deposit,
     required bool persist,
   }) {
-    if (amountSatang <= 0 || amountSatang > maxMoneyInputSatang) {
-      return SavingResult(0, null, 0);
-    }
     final now = (date ?? DateTime.now()).toUtc();
     int exp = 0;
     int overflowSatang = 0;
     Goal? completed;
 
-    if (goalId != null) {
-      final g = goals.firstWhere((x) => x.id == goalId);
+    if (goal != null) {
+      final g = goal;
       final spaceSatang = g.remainingSatang;
       final putSatang = amountSatang < spaceSatang ? amountSatang : spaceSatang;
       overflowSatang = amountSatang - putSatang;
@@ -426,7 +508,7 @@ class AppState extends ChangeNotifier {
           type: source,
           amountSatang: putSatang,
           date: now,
-          goalId: goalId,
+          goalId: goal.id,
           note: note,
           expAwarded: exp,
         ),
@@ -444,14 +526,14 @@ class AppState extends ChangeNotifier {
           type: TxType.unallocated,
           amountSatang: overflowSatang,
           date: now,
-          note: goalId != null ? 'ส่วนเกินจากกระปุกที่เต็ม' : note,
+          note: goal != null ? 'ส่วนเกินจากกระปุกที่เต็ม' : note,
         ),
       );
     }
 
     // quest: บันทึกเงินออม
     for (final q in quests) {
-      if (q.id == 'q-deposit' && !q.claimed && goalId != null) {
+      if (q.id == 'q-deposit' && !q.claimed && goal != null) {
         q.progress = (q.progress + 1).clamp(0, q.target);
       }
     }
@@ -465,28 +547,24 @@ class AppState extends ChangeNotifier {
     return SavingResult(exp, completed, overflowSatang);
   }
 
-  void allocateUnallocated(int amountSatang, String goalId) {
-    if (amountSatang <= 0) return;
-    if (amountSatang > unallocatedSatang) {
-      amountSatang = unallocatedSatang;
-    }
-    unallocatedSatang -= amountSatang;
-    addSaving(
-      amountSatang: amountSatang,
-      goalId: goalId,
+  void allocateUnallocated(num amountSatang, String goalId) {
+    final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
+    final goal = _requireGoal(goalId);
+    if (unallocatedSatang <= 0) return;
+    final allocatedSatang = validatedAmountSatang > unallocatedSatang
+        ? unallocatedSatang
+        : validatedAmountSatang;
+    unallocatedSatang -= allocatedSatang;
+    _addSaving(
+      amountSatang: allocatedSatang,
+      goal: goal,
+      persist: true,
     ); // overflow กลับเข้า pool เอง
   }
 
   int claimQuest(String id) {
-    final q = quests.firstWhere((x) => x.id == id,
-        orElse: () => Quest(
-            id: '',
-            title: '',
-            description: '',
-            period: '',
-            target: 1,
-            expReward: 0));
-    if (q.id.isEmpty || q.claimed || !q.complete) return 0;
+    final q = quests.where((quest) => quest.id == id).firstOrNull;
+    if (q == null || q.claimed || !q.complete) return 0;
     q.claimed = true;
     user.exp += q.expReward;
     _save();
@@ -511,10 +589,14 @@ class AppState extends ChangeNotifier {
     required String name,
     required SaverMode mode,
     required String goalName,
-    required int targetSatang,
+    required num targetSatang,
     required DateTime targetDate,
     String emoji = '🎯',
   }) {
+    final validatedTargetSatang = validateMoneyAmountSatang(
+      targetSatang,
+      fieldName: 'targetSatang',
+    );
     user.name = name;
     user.mode = mode;
     user.exp = 0;
@@ -527,7 +609,7 @@ class AppState extends ChangeNotifier {
     badges = _defaultBadges();
     addGoal(
       name: goalName,
-      targetSatang: targetSatang,
+      targetSatang: validatedTargetSatang,
       targetDate: targetDate,
       emoji: emoji,
     );

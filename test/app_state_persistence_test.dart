@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -127,5 +128,72 @@ void main() {
 
     expect(find.textContaining('โหลดข้อมูลไม่สำเร็จ'), findsOneWidget);
     expect(find.byType(MaterialBanner), findsOneWidget);
+  });
+
+  test('save debounce writes only the latest snapshot', () async {
+    final writes = <Map<String, dynamic>>[];
+    final app = AppState(
+      stateWriter: (raw) async {
+        writes.add(jsonDecode(raw) as Map<String, dynamic>);
+        return true;
+      },
+    );
+
+    app.setName('ชื่อแรก');
+    app.setName('ชื่อล่าสุด');
+
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    await app.flushPendingSaves();
+
+    expect(writes, hasLength(1));
+    expect(
+        (writes.single['user'] as Map<String, dynamic>)['name'], 'ชื่อล่าสุด');
+    app.dispose();
+  });
+
+  test('save queue never starts a newer write before the previous write',
+      () async {
+    final writes = <Map<String, dynamic>>[];
+    final completions = <Completer<bool>>[];
+    final app = AppState(
+      stateWriter: (raw) {
+        writes.add(jsonDecode(raw) as Map<String, dynamic>);
+        final completion = Completer<bool>();
+        completions.add(completion);
+        return completion.future;
+      },
+    );
+
+    app.setName('snapshot-1');
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    expect(writes, hasLength(1));
+
+    app.setName('snapshot-2');
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    expect(writes, hasLength(1));
+
+    completions.first.complete(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(writes, hasLength(2));
+    expect((writes[0]['user'] as Map<String, dynamic>)['name'], 'snapshot-1');
+    expect((writes[1]['user'] as Map<String, dynamic>)['name'], 'snapshot-2');
+
+    completions[1].complete(true);
+    await app.flushPendingSaves();
+    app.dispose();
+  });
+
+  test('save failure is exposed through an observable Thai message', () async {
+    final app = AppState(stateWriter: (_) async => false);
+    var notifications = 0;
+    app.addListener(() => notifications++);
+
+    app.setName('ข้อมูลที่ต้องบันทึก');
+    await app.flushPendingSaves();
+
+    expect(app.loadErrorMessage, isNotNull);
+    expect(app.loadErrorMessage, contains('บันทึกข้อมูลล่าสุดไม่สำเร็จ'));
+    expect(notifications, greaterThanOrEqualTo(2));
+    app.dispose();
   });
 }
