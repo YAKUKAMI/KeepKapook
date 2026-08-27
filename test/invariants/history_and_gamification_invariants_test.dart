@@ -28,20 +28,17 @@ void main() {
       id: 'goal',
       name: 'ทริปญี่ปุ่น',
       targetSatang: 100000,
-      currentSatang: 25000,
     );
     final app = AppState()
       ..loaded = true
-      ..goals = <Goal>[goal]
-      ..transactions = <SavingTransaction>[
-        SavingTransaction(
-          id: 'tx',
-          type: TxType.deposit,
-          amountSatang: 25000,
-          date: invariantTime,
-          destinationGoalId: goal.id,
-        ),
-      ];
+      ..goals = <Goal>[goal];
+
+    app.addSaving(
+      amountSatang: 25000,
+      goalId: goal.id,
+      date: invariantTime,
+    );
+    expect(app.transactions.single.destinationGoalNameSnapshot, 'ทริปญี่ปุ่น');
 
     app.deleteGoal(goal.id);
     await tester.pumpWidget(
@@ -57,6 +54,7 @@ void main() {
 
     expect(find.textContaining('ทริปญี่ปุ่น'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await app.flushPendingSaves();
   });
 
   test('I11 every default quest has a reachable progress handler', () async {

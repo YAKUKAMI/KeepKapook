@@ -52,6 +52,7 @@ void main() {
         amountSatang: 25075,
         date: at,
         destinationGoalId: 'goal-1',
+        destinationGoalNameSnapshot: 'จักรยาน',
         note: 'จากสลิป',
         expAwarded: 30,
         isPossibleDuplicate: true,

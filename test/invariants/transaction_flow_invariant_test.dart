@@ -75,6 +75,14 @@ void main() {
             'expected ${expected.name}',
           );
         }
+        if (transaction.goalId != null &&
+            transaction.sourceGoalNameSnapshot == null) {
+          violations.add('$name: missing source goal-name snapshot');
+        }
+        if (transaction.destinationGoalId != null &&
+            transaction.destinationGoalNameSnapshot == null) {
+          violations.add('$name: missing destination goal-name snapshot');
+        }
       }
     }
 

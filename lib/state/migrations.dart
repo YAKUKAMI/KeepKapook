@@ -1,7 +1,7 @@
 import '../models/models.dart';
 import '../utils/format.dart';
 
-const int currentSchemaVersion = 4;
+const int currentSchemaVersion = 5;
 
 typedef StateMigration = Map<String, dynamic> Function(
   Map<String, dynamic> state,
@@ -12,6 +12,7 @@ final Map<int, StateMigration> _migrationSteps = <int, StateMigration>{
   1: _migrateV1ToV2,
   2: _migrateV2ToV3,
   3: _migrateV3ToV4,
+  4: _migrateV4ToV5,
 };
 
 Map<String, dynamic> _migrateV1ToV2(Map<String, dynamic> state) {
@@ -155,6 +156,86 @@ Map<String, dynamic> _migrateV3ToV4(Map<String, dynamic> state) {
     return goal;
   }).toList();
   return migrated;
+}
+
+const Set<String> _activeQuestIds = <String>{'q-deposit', 'q-allocate'};
+const Set<String> _activeBadgeIds = <String>{
+  'b-first-drop',
+  'b-halfway',
+  'b-crusher',
+  'b-triple',
+};
+const Set<String> _retiredBadgeIds = <String>{'b-rhythm', 'b-memory'};
+
+Map<String, dynamic> _migrateV4ToV5(Map<String, dynamic> state) {
+  final migrated = Map<String, dynamic>.from(state);
+  final goalNamesById = <String, String>{};
+  final rawGoals = state['goals'];
+  if (rawGoals != null && rawGoals is! List) {
+    throw const FormatException('goals ต้องเป็น JSON array');
+  }
+  for (final rawGoal in (rawGoals as List? ?? const <dynamic>[])) {
+    if (rawGoal is! Map) {
+      throw const FormatException('ข้อมูล goal ต้องเป็น JSON object');
+    }
+    final goal = Map<String, dynamic>.from(rawGoal);
+    final id = goal['id']?.toString();
+    final name = goal['name']?.toString();
+    if (id != null && name != null) goalNamesById[id] = name;
+  }
+
+  final rawTransactions = state['transactions'];
+  if (rawTransactions != null && rawTransactions is! List) {
+    throw const FormatException('transactions ต้องเป็น JSON array');
+  }
+  migrated['transactions'] =
+      (rawTransactions as List? ?? const <dynamic>[]).map((rawTransaction) {
+    if (rawTransaction is! Map) {
+      throw const FormatException('ข้อมูล transaction ต้องเป็น JSON object');
+    }
+    final transaction = Map<String, dynamic>.from(rawTransaction);
+    final sourceId = transaction['goalId']?.toString();
+    final destinationId = transaction['destinationGoalId']?.toString();
+    transaction['sourceGoalNameSnapshot'] =
+        sourceId == null ? null : goalNamesById[sourceId];
+    transaction['destinationGoalNameSnapshot'] =
+        destinationId == null ? null : goalNamesById[destinationId];
+    return transaction;
+  }).toList();
+
+  migrated['quests'] = _filterJsonObjects(
+    state['quests'],
+    keep: (entry) => _activeQuestIds.contains(entry['id']?.toString()),
+    fieldName: 'quests',
+  );
+  migrated['badges'] = _filterJsonObjects(
+    state['badges'],
+    keep: (entry) {
+      final id = entry['id']?.toString();
+      if (_activeBadgeIds.contains(id)) return true;
+      return _retiredBadgeIds.contains(id) && entry['unlocked'] == true;
+    },
+    fieldName: 'badges',
+  );
+  return migrated;
+}
+
+List<Map<String, dynamic>> _filterJsonObjects(
+  Object? value, {
+  required bool Function(Map<String, dynamic>) keep,
+  required String fieldName,
+}) {
+  if (value == null) return <Map<String, dynamic>>[];
+  if (value is! List) throw FormatException('$fieldName ต้องเป็น JSON array');
+  final kept = <Map<String, dynamic>>[];
+  for (final rawEntry in value) {
+    if (rawEntry is! Map) {
+      throw FormatException('ข้อมูล $fieldName ต้องเป็น JSON object');
+    }
+    final entry = Map<String, dynamic>.from(rawEntry);
+    if (keep(entry)) kept.add(entry);
+  }
+  return kept;
 }
 
 TransactionFlow _legacyTransactionFlow(Object? value, TxType type) {

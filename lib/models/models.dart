@@ -243,6 +243,8 @@ class SavingTransaction {
   DateTime date;
   String? goalId;
   String? destinationGoalId;
+  String? sourceGoalNameSnapshot;
+  String? destinationGoalNameSnapshot;
   String note;
   int expAwarded;
   bool isPossibleDuplicate;
@@ -255,6 +257,8 @@ class SavingTransaction {
     required this.date,
     this.goalId,
     this.destinationGoalId,
+    this.sourceGoalNameSnapshot,
+    this.destinationGoalNameSnapshot,
     this.note = '',
     this.expAwarded = 0,
     this.isPossibleDuplicate = false,
@@ -277,6 +281,8 @@ class SavingTransaction {
         'date': date.toIso8601String(),
         'goalId': goalId,
         'destinationGoalId': destinationGoalId,
+        'sourceGoalNameSnapshot': sourceGoalNameSnapshot,
+        'destinationGoalNameSnapshot': destinationGoalNameSnapshot,
         'note': note,
         'expAwarded': expAwarded,
         'isPossibleDuplicate': isPossibleDuplicate,
@@ -296,6 +302,8 @@ class SavingTransaction {
       date: _dateValue(j['date']),
       goalId: j['goalId']?.toString(),
       destinationGoalId: j['destinationGoalId']?.toString(),
+      sourceGoalNameSnapshot: j['sourceGoalNameSnapshot']?.toString(),
+      destinationGoalNameSnapshot: j['destinationGoalNameSnapshot']?.toString(),
       note: _stringValue(j['note'], ''),
       expAwarded: _intValue(j['expAwarded']),
       isPossibleDuplicate: _boolValue(j['isPossibleDuplicate'], false),

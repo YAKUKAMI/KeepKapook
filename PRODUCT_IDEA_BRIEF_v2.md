@@ -43,8 +43,8 @@
 - ฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก เป็นการจำลอง และ UI ต้องแจ้งเสมอ
 - จำนวนเงินที่ persist ทุก field เป็น `int` หน่วยสตางค์: `amountSatang`, `targetSatang`, `currentSatang`, `unallocatedSatang`; `double` ที่พบเป็น progress/confidence ไม่ใช่ยอดเงิน
 - persist ในเครื่องด้วย `shared_preferences` เป็น JSON object ก้อนเดียวที่ key `keepkapook_state_v1`
-- JSON ที่เขียนใหม่มี `schemaVersion: 4`; ชื่อ key ที่ลงท้าย `_v1` เป็นชื่อเดิมเพื่อ compatibility ไม่ใช่ schema version
-- migration ปัจจุบันอยู่ `lib/state/migrations.dart`: ข้อมูลที่ไม่มี `schemaVersion` ถือเป็น v1, migrate v1→v2 เพื่อแปลงเงินบาท `double` เป็นสตางค์ `int`, v2→v3 เพื่อเพิ่ม flow/destination ID และ v3→v4 เพื่อ canonicalize type/flow พร้อมจำ milestone สูงสุดโดยไม่หัก EXP เดิม
+- JSON ที่เขียนใหม่มี `schemaVersion: 5`; ชื่อ key ที่ลงท้าย `_v1` เป็นชื่อเดิมเพื่อ compatibility ไม่ใช่ schema version
+- migration ปัจจุบันอยู่ `lib/state/migrations.dart`: ข้อมูลที่ไม่มี `schemaVersion` ถือเป็น v1, migrate v1→v2 เพื่อแปลงเงินบาท `double` เป็นสตางค์ `int`, v2→v3 เพื่อเพิ่ม flow/destination ID, v3→v4 เพื่อ canonicalize type/flow พร้อมจำ milestone สูงสุด และ v4→v5 เพื่อเก็บชื่อ goal ในประวัติพร้อมถอน quest/badge ที่ไม่มี handler โดยไม่หัก EXP เดิม
 - ทุกการเปลี่ยน model/persistence ต้อง bump schema และเพิ่ม migration แบบต่อขั้น
 - ต้องทำงานทั้ง web และ mobile
 - ห้ามใส่ secret / token / signing key ใน repo
@@ -572,7 +572,7 @@ W8 retention ≥ 15% · มีผู้ใช้ ≥ 50 คนที่ใช้
 | I7 | กราฟ/สรุปเงินเข้าใช้ externalIn และไม่นับ internal |
 | I8 | model ทุกตัวต้อง JSON round-trip ได้เท่ากัน |
 | I9 | JSON พังต้องมี backup และห้ามล้างเงียบ |
-| I10 | ลบ goal แล้วประวัติเดิมต้องยังอ่านชื่อได้ |
+| I10 | ลบ goal แล้วประวัติเดิมต้องยังอ่านชื่อได้จาก transaction snapshot |
 | I11 | quest และ badge ทุกตัวต้องมี handler ที่ทำสำเร็จได้จริง |
 | I12 | undo ต้องคืน TOTAL, EXP, quest และ badge ครบ |
 | I13 | ทุก TxType ต้องมี canonical flow ค่าเดียว และ transaction ทุก action ต้องผ่าน mapping กลาง |

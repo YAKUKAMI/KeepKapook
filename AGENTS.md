@@ -44,7 +44,7 @@ lib/
 │                            AchievementBadge, AppUser + enums
 ├─ state/app_state.dart      AppState (ChangeNotifier): action หลัก + persist + _initEmpty()
 ├─ state/conversational_entries.dart  part: save/undo + แก้ไข/ลบประวัติ
-├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3→v4)
+├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3→v4→v5)
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
@@ -89,13 +89,13 @@ test/
 - SharedPreferences key: `keepkapook_state_v1`
 - Corrupt backup key: `keepkapook_state_v1_corrupt_backup`
 - Pre-import backup key: `keepkapook_state_v1_pre_import_backup` — เก็บ state ปัจจุบันก่อนกู้คืนทับทุกครั้ง
-- รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 4` และ migration framework ที่ `lib/state/migrations.dart`
+- รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 5` และ migration framework ที่ `lib/state/migrations.dart`
 
 ตัวอย่างย่อของ JSON ที่ persist จริงในปัจจุบัน:
 
 ```json
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "user": {"name": "...", "emoji": "🐷", "exp": 0,
     "consistencyWeeks": 0, "mode": "adult", "onboarded": true},
   "goals": [{
@@ -109,7 +109,9 @@ test/
   }],
   "transactions": [{"id": "...", "type": "deposit", "flow": "externalIn",
     "amountSatang": 50000, "date": "2026-08-24T00:00:00.000",
-    "goalId": null, "destinationGoalId": "g-...", "note": "",
+    "goalId": null, "destinationGoalId": "g-...",
+    "sourceGoalNameSnapshot": null,
+    "destinationGoalNameSnapshot": "เงินฉุกเฉิน", "note": "",
     "expAwarded": 10, "isPossibleDuplicate": false}],
   "quests": [{"id": "q-deposit", "title": "...", "description": "...", "period": "daily", "target": 1, "progress": 0, "expReward": 15, "claimed": false}],
   "badges": [{"id": "b-first-drop", "name": "...", "description": "...", "emoji": "💧", "condition": "...", "unlocked": false, "progress": 0.0}],
@@ -119,7 +121,7 @@ test/
 ```
 
 - สถานะการโหลดปัจจุบัน: ข้อมูลไม่มี `schemaVersion` ถือเป็น v1 แล้วเขียนกลับพร้อม version; ถ้า parse ไม่ผ่านหรือ version ใหม่กว่าแอป จะสำรอง raw JSON และแสดง `MaterialBanner` ภาษาไทยก่อนใช้ state ว่าง
-- ชื่อ key ลงท้าย `_v1` เป็นชื่อ storage key เดิมเพื่อรักษาความเข้ากันได้ ไม่ใช่เลข schema ปัจจุบัน; schema ใน JSON คือ v4
+- ชื่อ key ลงท้าย `_v1` เป็นชื่อ storage key เดิมเพื่อรักษาความเข้ากันได้ ไม่ใช่เลข schema ปัจจุบัน; schema ใน JSON คือ v5
 - **ทุกครั้งที่เพิ่ม/เปลี่ยน/ลบ field ใน model ต้องเพิ่ม `schemaVersion` และเขียน migration**
   ค่า version ปัจจุบันและ migration steps อยู่ใน `lib/state/migrations.dart`
 - `fromJson` ทุกตัวต้องทนข้อมูลเก่า: field ที่เพิ่มใหม่ต้องมี default ไม่ใช่ `!`
@@ -128,6 +130,7 @@ test/
 - migration v2→v3 ย้าย destination ของ deposit/slip/adjust ไป `destinationGoalId` และกู้ปลายทาง transfer จากชื่อใน note เฉพาะเมื่อ exact match ได้หนึ่ง goal เท่านั้น; ชื่อซ้ำ/หาไม่พบต้องคง null และห้าม parse note นอก migration
 - ข้อจำกัดของข้อมูล v2: allocate เคย persist เป็น `TxType.deposit` และ withdraw ไม่ได้ persist ค่า `toUnallocated`; migration จึง map flow ตาม `TxType` ที่เก็บไว้เท่านั้น (`deposit`→`externalIn`, `withdraw`→`externalOut`) และไม่เดาจากยอดหรือลำดับรายการ
 - migration v3→v4 canonicalize คู่ type/flow เดิม (`deposit/internal`→`allocate`, `withdraw/internal`→`deallocate`) และเติม `Goal.highestMilestonePercent` เพื่อกัน milestone EXP ซ้ำ โดยไม่แก้หรือลด `user.exp` เดิม
+- migration v4→v5 เติม `sourceGoalNameSnapshot`/`destinationGoalNameSnapshot` จาก goal ที่ยังอยู่, ถอน quest/badge ที่ไม่มี handler และคง retired badge ที่ unlock แล้ว โดยไม่แก้หรือลด `user.exp`
 - `note` ของ transaction ใหม่เป็นข้อความที่ผู้ใช้กรอกเท่านั้น ห้ามซ่อน source/destination หรือข้อมูลโครงสร้างไว้ในข้อความ
 
 ### กฎ Flow / EXP / Summary
@@ -262,8 +265,8 @@ flutter build apk --release  # Android SDK ติดตั้งแล้ว; AP
 **เพิ่ม field ใน model**
 `models/models.dart` (ใส่ default ใน `fromJson`) → bump `schemaVersion` → เขียน migration → รันแอปด้วยข้อมูลเก่าดูว่าไม่พัง → unit test round-trip `toJson`/`fromJson`
 
-**เพิ่ม schema v5 (หรือ version ถัดไป)**
-เพิ่ม `currentSchemaVersion` ใน `state/migrations.dart` → เขียน `_migrateV4ToV5` → เพิ่ม `4: _migrateV4ToV5` ใน `_migrationSteps` (key คือ version ต้นทาง) → เขียน unit test migrate จาก v4 และทดสอบ migrate ต่อขั้นจาก v1 ถึง version ล่าสุด
+**เพิ่ม schema v6 (หรือ version ถัดไป)**
+เพิ่ม `currentSchemaVersion` ใน `state/migrations.dart` → เขียน `_migrateV5ToV6` → เพิ่ม `5: _migrateV5ToV6` ใน `_migrationSteps` (key คือ version ต้นทาง) → เขียน unit test migrate จาก v5 และทดสอบ migrate ต่อขั้นจาก v1 ถึง version ล่าสุด
 
 **เพิ่ม quest หรือ badge**
 เพิ่ม definition + เงื่อนไข unlock (เป็น pure function) → unit test เงื่อนไข → เช็กว่า celebration dialog ไม่เด้งซ้ำ
@@ -285,7 +288,7 @@ void someAction(...) {
 ## 10. Backlog
 
 ### P0 — ต้องเสร็จก่อนปล่อยผู้ใช้จริง
-- [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v4)
+- [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v5)
 - [x] เปลี่ยนยอดเงินเป็น `int` สตางค์ + migration v1→v2
 - [x] Export / Import ข้อมูลเป็นไฟล์ JSON พร้อม validate, migration, preview และ pre-import backup
 - [x] Disclaimer "ไม่ใช่แอปธนาคาร ไม่มีเงินจริง" ใน onboarding + Settings
@@ -308,7 +311,11 @@ void someAction(...) {
 - [ ] CI (GitHub Actions): analyze + test + build web ทุก PR
 - [x] แยก flexible pocket ให้รับเงินไม่จำกัด ไม่มี overflow/progress/milestone/completed
 - [x] แก้กราฟ 7 วันและค่าเฉลี่ยเงินออมให้นับจาก `TransactionFlow.externalIn`
-- [ ] ทำ progress logic ให้ quest `q-weekly-review`, `q-weekly-consistency` และ badge `b-rhythm`, `b-memory` (`q-allocate` ทำแล้ว)
+- [x] `q-allocate` มี handler จาก event จัดสรรจริง และไม่แจก base/milestone EXP ซ้ำ
+- [ ] คืน `q-weekly-review` ในรอบ 13 เมื่อ Weekly Review มี completion event และเทส progress จริง (ถอนจาก default/state ที่ยังไม่สำเร็จใน schema v5)
+- [ ] คืน `q-weekly-consistency` ในรอบ 11 เมื่อระบบ streak มี event source และเทส progress จริง (ถอนจาก default/state ใน schema v5)
+- [ ] คืน `b-rhythm` ในรอบ 11 เมื่อ streak unlock ได้จริง; badge ของผู้ใช้เดิมที่ unlock แล้วต้องคงอยู่ (ถอนเฉพาะตัวที่ยังไม่ unlock ใน schema v5)
+- [ ] พิจารณา `b-memory` ใหม่เมื่อมี Album subsystem ที่อนุมัติเข้าแผนหลัง Phase 2 และมี unlock event/test; ตอนนี้ลบจาก default และถอนเฉพาะตัวที่ยังไม่ unlock ใน schema v5
 - [ ] เพิ่ม category selector ใน NewGoal และกำหนดพฤติกรรมของ `GoalPriority` (ปัจจุบัน persist อย่างเดียว)
 - [x] เพิ่ม `TransactionFlow` + `destinationGoalId` และ migration v2→v3; transaction ใหม่ไม่เก็บข้อมูลโครงสร้างใน `note`
 - [ ] รวม date/time calculation ไว้ helper กลางและทำ UTC/local boundary ให้สม่ำเสมอ

@@ -125,8 +125,9 @@ class HistoryScreen extends StatelessWidget {
                 style: TextStyle(color: AppColors.mutedText),
               ),
             ...txs.map((t) {
-              final sourceName = goalName(t.goalId);
-              final destinationName = goalName(t.destinationGoalId);
+              final sourceName = t.sourceGoalNameSnapshot ?? goalName(t.goalId);
+              final destinationName = t.destinationGoalNameSnapshot ??
+                  goalName(t.destinationGoalId);
               final unknownDestination = hasUnknownTransferDestination(t);
               return ListTile(
                 onTap: unknownDestination

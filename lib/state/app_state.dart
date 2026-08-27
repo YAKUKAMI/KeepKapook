@@ -333,6 +333,7 @@ class AppState extends ChangeNotifier {
         amountSatang: takeSatang,
         date: DateTime.now(),
         goalId: id,
+        sourceGoalNameSnapshot: g.name,
       ),
     );
     _save();
@@ -377,6 +378,8 @@ class AppState extends ChangeNotifier {
         date: now,
         goalId: fromId,
         destinationGoalId: toId,
+        sourceGoalNameSnapshot: from.name,
+        destinationGoalNameSnapshot: to.name,
       ),
     );
     _save();
@@ -454,6 +457,14 @@ class AppState extends ChangeNotifier {
 
   void deleteGoal(String id) {
     final goal = _requireGoal(id);
+    for (final transaction in transactions) {
+      if (transaction.goalId == id) {
+        transaction.sourceGoalNameSnapshot ??= goal.name;
+      }
+      if (transaction.destinationGoalId == id) {
+        transaction.destinationGoalNameSnapshot ??= goal.name;
+      }
+    }
     goals.remove(goal);
     _save();
     notifyListeners();
@@ -530,6 +541,7 @@ class AppState extends ChangeNotifier {
             amountSatang: putSatang,
             date: now,
             destinationGoalId: goal.id,
+            destinationGoalNameSnapshot: goal.name,
             note: note,
             expAwarded: exp,
           ),
@@ -734,20 +746,6 @@ class AppState extends ChangeNotifier {
             period: 'daily',
             target: 1,
             expReward: 15),
-        Quest(
-            id: 'q-weekly-review',
-            title: 'ทบทวนเป้าหมาย',
-            description: 'เปิดดูกระปุก 3 ครั้งสัปดาห์นี้',
-            period: 'weekly',
-            target: 3,
-            expReward: 40),
-        Quest(
-            id: 'q-weekly-consistency',
-            title: 'รักษาความสม่ำเสมอ',
-            description: 'ออมตามแผน 5 ครั้งสัปดาห์นี้',
-            period: 'weekly',
-            target: 5,
-            expReward: 40),
       ];
 
   List<AchievementBadge> _defaultBadges() => [
@@ -757,12 +755,6 @@ class AppState extends ChangeNotifier {
             description: 'ออมครั้งแรก',
             emoji: '💧',
             condition: 'บันทึกเงินออมครั้งแรก'),
-        AchievementBadge(
-            id: 'b-rhythm',
-            name: '7-Day Rhythm',
-            description: 'ทำตามแผน 7 ครั้ง',
-            emoji: '🎵',
-            condition: 'ออมตามแผน 7 ครั้ง'),
         AchievementBadge(
             id: 'b-halfway',
             name: 'Halfway Hero',
@@ -781,11 +773,5 @@ class AppState extends ChangeNotifier {
             description: 'สำเร็จ 3 เป้าหมาย',
             emoji: '👑',
             condition: 'ทำเป้าหมายสำเร็จ 3 อัน'),
-        AchievementBadge(
-            id: 'b-memory',
-            name: 'Memory Maker',
-            description: 'เพิ่มรูป 10 รูป',
-            emoji: '📸',
-            condition: 'เพิ่มรูปใน Album 10 รูป'),
       ];
 }

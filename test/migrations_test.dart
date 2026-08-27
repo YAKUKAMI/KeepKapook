@@ -32,7 +32,7 @@ void main() {
     );
   });
 
-  test('v1 → v4 แปลงเงินบาทและ migrate transaction ต่อขั้น', () {
+  test('v1 → v5 แปลงเงินบาทและ migrate transaction ต่อขั้น', () {
     final raw = <String, dynamic>{
       'schemaVersion': 1,
       'goals': <dynamic>[
@@ -155,7 +155,8 @@ void main() {
     expect(entries['slip']!['destinationGoalId'], 'destination');
   });
 
-  test('v3 → v4 canonicalize type/flow และจำ milestone โดยไม่หัก EXP เดิม', () {
+  test('v3 → v5 คงผล v4 เรื่อง canonical flow/milestone และไม่หัก EXP เดิม',
+      () {
     final raw = <String, dynamic>{
       'schemaVersion': 3,
       'user': <String, dynamic>{'exp': 777},
@@ -207,12 +208,95 @@ void main() {
     };
     final goal = (migrated['goals'] as List).single as Map<String, dynamic>;
 
-    expect(migrated['schemaVersion'], 4);
+    expect(migrated['schemaVersion'], currentSchemaVersion);
     expect((migrated['user'] as Map<String, dynamic>)['exp'], 777);
     expect(entries['milestone']!['type'], 'deposit');
     expect(entries['legacy-allocate']!['type'], 'allocate');
     expect(entries['legacy-deallocate']!['type'], 'deallocate');
     expect(goal['highestMilestonePercent'], 25);
+  });
+
+  test(
+      'v4 → v5 ลบภารกิจที่ทำไม่ได้ รักษา badge ที่ unlock และเติม goal snapshots',
+      () {
+    final raw = <String, dynamic>{
+      'schemaVersion': 4,
+      'user': <String, dynamic>{'exp': 777},
+      'goals': <dynamic>[
+        _v2Goal('source', 'ต้นทาง'),
+        _v2Goal('destination', 'ปลายทาง'),
+      ],
+      'transactions': <dynamic>[
+        <String, dynamic>{
+          ..._v2Transaction('deposit', 'deposit'),
+          'flow': 'externalIn',
+          'destinationGoalId': 'destination',
+        },
+        <String, dynamic>{
+          ..._v2Transaction('transfer', 'transfer', goalId: 'source'),
+          'flow': 'internal',
+          'destinationGoalId': 'destination',
+        },
+        <String, dynamic>{
+          ..._v2Transaction('deleted', 'withdraw', goalId: 'deleted-goal'),
+          'flow': 'externalOut',
+          'destinationGoalId': null,
+        },
+      ],
+      'quests': <dynamic>[
+        _quest('q-deposit', progress: 1),
+        _quest('q-allocate', progress: 1),
+        _quest('q-weekly-review', progress: 2),
+        _quest('q-weekly-consistency', progress: 4),
+      ],
+      'badges': <dynamic>[
+        _badge('b-first-drop', unlocked: true),
+        _badge('b-rhythm', unlocked: true),
+        _badge('b-memory', unlocked: false),
+      ],
+    };
+
+    final migrated = migrateState(raw, 4);
+    final transactions = <String, Map<String, dynamic>>{
+      for (final entry in migrated['transactions'] as List)
+        (entry as Map<String, dynamic>)['id'] as String: entry,
+    };
+    final questIds = (migrated['quests'] as List)
+        .map((entry) => (entry as Map<String, dynamic>)['id'])
+        .toList();
+    final badges =
+        (migrated['badges'] as List).cast<Map<String, dynamic>>().toList();
+
+    expect(migrated['schemaVersion'], 5);
+    expect((migrated['user'] as Map<String, dynamic>)['exp'], 777);
+    expect(questIds, <String>['q-deposit', 'q-allocate']);
+    expect(
+      badges.map((entry) => entry['id']),
+      <String>['b-first-drop', 'b-rhythm'],
+    );
+    expect(badges.singleWhere((entry) => entry['id'] == 'b-rhythm')['unlocked'],
+        isTrue);
+    expect(transactions['deposit']!['sourceGoalNameSnapshot'], isNull);
+    expect(transactions['deposit']!['destinationGoalNameSnapshot'], 'ปลายทาง');
+    expect(transactions['transfer']!['sourceGoalNameSnapshot'], 'ต้นทาง');
+    expect(
+      transactions['transfer']!['destinationGoalNameSnapshot'],
+      'ปลายทาง',
+    );
+    expect(transactions['deleted']!['sourceGoalNameSnapshot'], isNull);
+    expect(transactions['deleted']!['destinationGoalNameSnapshot'], isNull);
+
+    final unlockedMemory = migrateState(<String, dynamic>{
+      'schemaVersion': 4,
+      'goals': <dynamic>[],
+      'transactions': <dynamic>[],
+      'quests': <dynamic>[],
+      'badges': <dynamic>[_badge('b-memory', unlocked: true)],
+    }, 4);
+    expect(
+      ((unlockedMemory['badges'] as List).single as Map<String, dynamic>)['id'],
+      'b-memory',
+    );
   });
 }
 
@@ -251,4 +335,27 @@ String rawNoteFor(String id) => switch (id) {
       'not-found' => 'โอนไป ไม่มีชื่อนี้',
       'deleted-goal' => 'โอนไป กระปุกที่ถูกลบ',
       _ => throw ArgumentError.value(id, 'id'),
+    };
+
+Map<String, dynamic> _quest(String id, {required int progress}) =>
+    <String, dynamic>{
+      'id': id,
+      'title': id,
+      'description': id,
+      'period': 'daily',
+      'target': 5,
+      'progress': progress,
+      'expReward': 15,
+      'claimed': false,
+    };
+
+Map<String, dynamic> _badge(String id, {required bool unlocked}) =>
+    <String, dynamic>{
+      'id': id,
+      'name': id,
+      'description': id,
+      'emoji': '🏅',
+      'condition': id,
+      'unlocked': unlocked,
+      'progress': unlocked ? 1.0 : 0.0,
     };
