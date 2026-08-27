@@ -44,7 +44,7 @@ lib/
 │                            AchievementBadge, AppUser + enums
 ├─ state/app_state.dart      AppState (ChangeNotifier): action หลัก + persist + _initEmpty()
 ├─ state/conversational_entries.dart  part: save/undo + แก้ไข/ลบประวัติ
-├─ state/migrations.dart     schemaVersion + migration แบบต่อขั้น v1→v2→v3
+├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2)
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
@@ -191,7 +191,7 @@ flutter build apk --release  # Android SDK ติดตั้งแล้ว; AP
 - ❌ **ห้ามแก้/ลบ field ใน model โดยไม่เขียน migration** (§4)
 - ❌ **ห้ามใส่ข้อมูล mock/seed กลับเข้าไปในแอป** — แอปต้องเริ่มว่างเปล่าผ่าน onboarding เสมอ
 - ❌ **ห้ามใช้ `double` กับยอดเงิน**
-- ❌ **ห้ามลบหรือลดความชัดของข้อความ disclaimer / label "จำลอง"** บนฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก (§10)
+- ❌ **ห้ามลบหรือลดความชัดของข้อความ disclaimer / label "จำลอง"** บนฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก (§1 และ `simulation_notice.dart`)
 - ❌ ห้าม refactor ใหญ่พ่วงมากับงานฟีเจอร์ — แยกคนละรอบ
 - ❌ ห้าม commit ไฟล์ signing key, `.env`, หรือ google-services.json ที่มี secret
 
@@ -239,21 +239,14 @@ flutter build apk --release  # Android SDK ติดตั้งแล้ว; AP
 **เพิ่ม quest หรือ badge**
 เพิ่ม definition + เงื่อนไข unlock (เป็น pure function) → unit test เงื่อนไข → เช็กว่า celebration dialog ไม่เด้งซ้ำ
 
-**pattern ของ action (ลอกได้เลย)**
+**โครง action ใหม่ (ปรับชื่อ field/method ให้ตรงโดเมนจริงก่อนใช้)**
 ```dart
-Future<void> addSaving(String goalId, int amountSatang, {DateTime? at}) async {
-  final goal = _goals.firstWhereOrNull((g) => g.id == goalId);
-  if (goal == null) return;
-  // 1) คำนวณด้วย pure function ที่เทสได้
-  final result = applySaving(goal, amountSatang, at ?? DateTime.now().toUtc());
-  // 2) อัปเดต state
-  _goals[_goals.indexOf(goal)] = result.goal;
-  _unallocatedSatang += result.overflowSatang;
-  _transactions.add(result.tx);
-  // 3) side effect ของ gamification
-  _grantExp(result.exp);
-  // 4) เสมอ
-  await _save();
+void someAction(...) {
+  // 1) validate input
+  // 2) คำนวณด้วย pure function ที่เทสได้เมื่อมี logic ตัวเลข
+  // 3) อัปเดต public state ของ AppState
+  // 4) persist + แจ้ง UI ตาม convention ปัจจุบัน
+  _save();
   notifyListeners();
 }
 ```
