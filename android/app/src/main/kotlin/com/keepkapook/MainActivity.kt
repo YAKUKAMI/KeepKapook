@@ -1,4 +1,4 @@
-package com.example.keepkapook
+package com.keepkapook
 
 import io.flutter.embedding.android.FlutterActivity
 
