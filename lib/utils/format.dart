@@ -130,6 +130,8 @@ class LevelInfo {
   final int need;
   final String title;
   LevelInfo(this.level, this.inLevel, this.need, this.title);
+
+  double get progress => need == 0 ? 0 : inLevel / need;
 }
 
 LevelInfo levelProgress(int totalExp) {

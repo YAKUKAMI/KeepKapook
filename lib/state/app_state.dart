@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
+import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 import '../utils/parser/parser.dart';
 import 'backup.dart';
@@ -265,18 +266,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  int get monthIncomeSatang => _monthSumSatang(LedgerType.income);
-  int get monthExpenseSatang => _monthSumSatang(LedgerType.expense);
-
-  int _monthSumSatang(LedgerType t) {
-    final now = DateTime.now();
-    return ledger.where((e) {
-      final localDate = e.date.toLocal();
-      return e.type == t &&
-          localDate.year == now.year &&
-          localDate.month == now.month;
-    }).fold<int>(0, (sum, entry) => sum + entry.amountSatang);
-  }
+  LedgerPeriodSummary ledgerMonthSummary({required DateTime now}) =>
+      summarizeLedgerMonth(ledger, now: now);
+  int get monthIncomeSatang =>
+      ledgerMonthSummary(now: DateTime.now()).incomeSatang;
+  int get monthExpenseSatang =>
+      ledgerMonthSummary(now: DateTime.now()).expenseSatang;
 
   // ---------- pocket / transfer / lock / shared ----------
   Goal? _goalById(String id) =>
@@ -405,14 +400,10 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------- derived ----------
-  int get totalSavedSatang =>
-      goals.fold<int>(0, (sum, goal) => sum + goal.currentSatang);
-  int get targetedSavedSatang => goals
-      .where((goal) => goal.hasSavingsTarget)
-      .fold<int>(0, (sum, goal) => sum + goal.currentSatang);
-  int get grandTargetSatang => goals
-      .where((goal) => goal.hasSavingsTarget)
-      .fold<int>(0, (sum, goal) => sum + goal.targetSatang);
+  GoalTotalsSummary get goalTotals => summarizeGoalTotals(goals);
+  int get totalSavedSatang => goalTotals.totalSavedSatang;
+  int get targetedSavedSatang => goalTotals.targetedSavedSatang;
+  int get grandTargetSatang => goalTotals.targetSatang;
   List<Goal> get activeGoals =>
       goals.where((goal) => !goal.isCompleted).toList();
   List<Goal> get completedGoals =>

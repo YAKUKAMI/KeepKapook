@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
-import '../utils/format.dart';
 import '../utils/coach.dart';
+import '../utils/financial_summary.dart';
+import '../utils/format.dart';
 import '../widgets/simulation_notice.dart';
 import 'add_saving_screen.dart';
 
@@ -23,6 +24,7 @@ class GoalDetailScreen extends StatelessWidget {
       return const Scaffold(body: Center(child: Text('ไม่พบกระปุกนี้')));
     }
     final color = Color(goal.themeColor);
+    final goalMoney = summarizeGoalMoney(goal);
     final txs = app.transactions.where((t) => t.goalId == goalId).toList();
 
     // ความเร็วออมเฉลี่ย + สถานะแผน (สำหรับ Recovery)
@@ -84,20 +86,21 @@ class GoalDetailScreen extends StatelessWidget {
                           width: 120,
                           height: 120,
                           child: CircularProgressIndicator(
-                            value: goal.progress,
+                            value: goalMoney.progress,
                             strokeWidth: 10,
                             backgroundColor: Colors.black12,
                             valueColor: AlwaysStoppedAnimation(color),
                           ),
                         ),
-                        Text('${(goal.progress * 100).toStringAsFixed(0)}%',
+                        Text(
+                            '${(goalMoney.progress * 100).toStringAsFixed(0)}%',
                             style: const TextStyle(
                                 fontSize: 22, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   )
                 else
-                  Text(formatMoney(goal.currentSatang),
+                  Text(formatMoney(goalMoney.currentSatang),
                       style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -108,11 +111,11 @@ class GoalDetailScreen extends StatelessWidget {
           const SizedBox(height: 20),
           _row(
             goal.flexible ? 'ยอดสะสม' : 'ยอดปัจจุบัน',
-            formatMoney(goal.currentSatang),
+            formatMoney(goalMoney.currentSatang),
           ),
           if (!goal.flexible) ...[
-            _row('เป้าหมาย', formatMoney(goal.targetSatang)),
-            _row('เหลืออีก', formatMoney(goal.remainingSatang)),
+            _row('เป้าหมาย', formatMoney(goalMoney.targetSatang)),
+            _row('เหลืออีก', formatMoney(goalMoney.remainingSatang)),
             _row('วันที่เหลือ', '${daysLeft(goal.targetDate)} วัน'),
             _row('กำหนดสำเร็จ', formatThaiDate(goal.targetDate, short: true)),
           ],
@@ -168,11 +171,11 @@ class GoalDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          if (!goal.isCompleted && plan != null && recovery != null) ...[
+          if (!goalMoney.isCompleted && plan != null && recovery != null) ...[
             _recoveryCard(context, app, goal, plan, recovery),
             const SizedBox(height: 20),
           ],
-          if (!goal.isCompleted)
+          if (!goalMoney.isCompleted)
             FilledButton.icon(
               onPressed: () => Navigator.push(
                 context,

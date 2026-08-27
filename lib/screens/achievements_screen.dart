@@ -46,7 +46,7 @@ class AchievementsScreen extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
-                    value: lp.need == 0 ? 0 : lp.inLevel / lp.need,
+                    value: lp.progress,
                     minHeight: 8,
                     backgroundColor: Colors.white24,
                     valueColor:
@@ -100,8 +100,8 @@ class _BadgeCard extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, fontSize: 12)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
           const SizedBox(height: 2),
           Text(
             badge.unlocked ? 'ปลดล็อกแล้ว' : badge.condition,

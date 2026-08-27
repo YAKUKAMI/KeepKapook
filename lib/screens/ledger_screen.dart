@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 
 class LedgerScreen extends StatelessWidget {
@@ -12,7 +13,7 @@ class LedgerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final entries = [...app.ledger]..sort((a, b) => b.date.compareTo(a.date));
-    final netSatang = app.monthIncomeSatang - app.monthExpenseSatang;
+    final month = summarizeLedgerMonth(app.ledger, now: DateTime.now());
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -43,18 +44,18 @@ class LedgerScreen extends StatelessWidget {
                 const Text('สรุปเดือนนี้',
                     style: TextStyle(color: AppColors.mutedText)),
                 const SizedBox(height: 4),
-                Text(formatMoney(netSatang),
+                Text(formatMoney(month.netSatang),
                     style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: netSatang >= 0
+                        color: month.netSatang >= 0
                             ? AppColors.deepGreen
                             : AppColors.error)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _mini('รายรับ', app.monthIncomeSatang, AppColors.mint),
-                    _mini('รายจ่าย', app.monthExpenseSatang, AppColors.coral),
+                    _mini('รายรับ', month.incomeSatang, AppColors.mint),
+                    _mini('รายจ่าย', month.expenseSatang, AppColors.coral),
                   ],
                 ),
               ],

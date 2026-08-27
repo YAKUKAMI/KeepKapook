@@ -48,6 +48,8 @@ lib/
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
+├─ utils/financial_summary.dart  pure summaries: goal totals/progress, monthly ledger,
+│                            7-day saving series (รับ `now` จาก caller)
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
 ├─ utils/parser/             pure-Dart parser + models + dictionary
 ├─ widgets/                  goal_card, celebration, simulation_notice,
@@ -64,6 +66,7 @@ test/
 ├─ coach_test.dart
 ├─ backup_test.dart
 ├─ app_state_money_test.dart
+├─ financial_summary_test.dart  parity ของ goal/month/7-day pure summaries
 ├─ parser_test.dart          corpus accuracy + parser edge cases
 ├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
 ├─ historical_edit_test.dart       edit/delete history + ledger
@@ -140,7 +143,7 @@ test/
 - นิยาม "วัน" = local midnight (Asia/Bangkok) ใช้ helper ตัวเดียวกันทั้งแอป ห้ามคำนวณ `DateTime.now().difference()` ตรงๆ ในหน้าจอ
 - ฟีเจอร์ที่ผูกกับวัน: กราฟ 7 วัน, streak, ล็อกเงิน 7/30/90 วัน, quest รายวัน
 - ล็อกเงินต้องเทียบกับ `unlockAt` ที่บันทึกไว้ ไม่ใช่นับถอยหลังจากเวลาปัจจุบัน (กันผู้ใช้หมุนนาฬิกาเครื่อง)
-- **สถานะโค้ดปัจจุบันยังไม่ทำตามกฎนี้ครบ:** timestamp บาง action ยังสร้างจาก local `DateTime.now()`, กราฟ 7 วันคำนวณใน `dashboard_screen.dart` และเทียบ `t.date` ตรงๆ โดยไม่แปลง timezone; ต้องแก้แยกรอบพร้อม test
+- **สถานะโค้ดปัจจุบันยังไม่ทำตามกฎนี้ครบ:** timestamp บาง action ยังสร้างจาก local `DateTime.now()`; สูตรกราฟ 7 วันย้ายไป `financial_summary.dart` และรับ `now` แล้ว แต่ยังเทียบ `t.date` ตรงๆ โดยไม่แปลง timezone และ I7 ยืนยันว่ากราฟยังนับ transfer เกินเข้ามา (รอบ refactor ตั้งใจยังไม่แก้ตัวเลข)
 
 ---
 

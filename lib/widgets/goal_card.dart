@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 
 class GoalCard extends StatelessWidget {
@@ -11,7 +12,8 @@ class GoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Color(goal.themeColor);
-    final done = goal.isCompleted;
+    final money = summarizeGoalMoney(goal);
+    final done = money.isCompleted;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -65,7 +67,7 @@ class GoalCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                formatMoney(goal.currentSatang),
+                formatMoney(money.currentSatang),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -76,7 +78,7 @@ class GoalCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    formatMoney(goal.currentSatang),
+                    formatMoney(money.currentSatang),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -84,7 +86,7 @@ class GoalCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '/ ${formatMoney(goal.targetSatang)}',
+                    '/ ${formatMoney(money.targetSatang)}',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.mutedText,
@@ -96,7 +98,7 @@ class GoalCard extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),
                 child: LinearProgressIndicator(
-                  value: goal.progress,
+                  value: money.progress,
                   minHeight: 8,
                   backgroundColor: Colors.black12,
                   valueColor: AlwaysStoppedAnimation(color),
@@ -107,7 +109,7 @@ class GoalCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '${(goal.progress * 100).toStringAsFixed(0)}%',
+                    '${(money.progress * 100).toStringAsFixed(0)}%',
                     style: TextStyle(
                       fontSize: 12,
                       color: color,
@@ -117,7 +119,7 @@ class GoalCard extends StatelessWidget {
                   Text(
                     done
                         ? 'เสร็จสิ้น'
-                        : 'เหลือ ${formatMoney(goal.remainingSatang)} · ${daysLeft(goal.targetDate)} วัน',
+                        : 'เหลือ ${formatMoney(money.remainingSatang)} · ${daysLeft(goal.targetDate)} วัน',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.mutedText,

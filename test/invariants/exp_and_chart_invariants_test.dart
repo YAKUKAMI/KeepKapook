@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:keepkapook/models/models.dart';
 import 'package:keepkapook/state/app_state.dart';
+import 'package:keepkapook/utils/financial_summary.dart';
 
 import 'invariant_test_support.dart';
 
@@ -78,13 +79,32 @@ void main() {
     );
   });
 
-  test(
-    'I7 seven-day graph counts only external inflow',
-    () {
-      fail('Unskip after the chart calculation accepts an injected clock.');
-    },
-    skip: 'Blocked: seven-day totals are private UI logic in _Chart and read '
-        'the wall clock directly; there is no injectable clock or public pure '
-        'function to test without changing production code.',
-  );
+  test('I7 seven-day graph counts only external inflow', () {
+    final externalDeposit = SavingTransaction(
+      id: 'external',
+      type: TxType.deposit,
+      amountSatang: 500,
+      date: invariantTime,
+      goalId: 'destination',
+    );
+    final internalTransfer = SavingTransaction(
+      id: 'transfer',
+      type: TxType.transfer,
+      amountSatang: 2000,
+      date: invariantTime,
+      goalId: 'source',
+      note: 'โอนไป destination',
+    );
+
+    final beforeTransfer = summarizeSevenDaySavings(
+      <SavingTransaction>[externalDeposit],
+      now: invariantTime,
+    ).map((day) => day.totalSatang).toList();
+    final afterTransfer = summarizeSevenDaySavings(
+      <SavingTransaction>[externalDeposit, internalTransfer],
+      now: invariantTime,
+    ).map((day) => day.totalSatang).toList();
+
+    expect(afterTransfer, beforeTransfer);
+  });
 }
