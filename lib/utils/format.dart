@@ -1,10 +1,64 @@
 import 'package:intl/intl.dart';
 
 // ---------- Money ----------
-String formatMoney(double amount) {
-  final hasDecimal = (amount * 100).round() % 100 != 0;
-  final f = NumberFormat(hasDecimal ? '#,##0.00' : '#,##0', 'th');
-  return '฿${f.format(amount)}';
+const int maxMoneyInputSatang = 10000000000; // ฿100,000,000
+const int _maxSafeMoneySatang = 9007199254740991; // JavaScript Number.MAX_SAFE_INTEGER
+
+final RegExp _moneyInputPattern =
+    RegExp(r'^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$');
+
+BigInt? _parseMoneyToSatangBigInt(String input) {
+  final trimmed = input.trim();
+  if (!_moneyInputPattern.hasMatch(trimmed)) return null;
+
+  final normalized = trimmed.replaceAll(',', '');
+  final parts = normalized.split('.');
+  final wholeBaht = BigInt.tryParse(parts[0]);
+  if (wholeBaht == null) return null;
+
+  final fraction = parts.length == 2 ? parts[1] : '';
+  final twoDigits = '${fraction}00'.substring(0, 2);
+  var satang = wholeBaht * BigInt.from(100) + BigInt.parse(twoDigits);
+
+  // ปัดครึ่งขึ้น: หลักทศนิยมที่ 3 ตั้งแต่ 5 ขึ้นไป เพิ่ม 1 สตางค์
+  if (fraction.length > 2 && fraction.codeUnitAt(2) >= 53) {
+    satang += BigInt.one;
+  }
+  return satang;
+}
+
+int? parseMoneyToSatang(
+  String input, {
+  int? maxSatang = maxMoneyInputSatang,
+}) {
+  final satang = _parseMoneyToSatangBigInt(input);
+  if (satang == null || satang > BigInt.from(_maxSafeMoneySatang)) return null;
+  if (maxSatang != null && satang > BigInt.from(maxSatang)) return null;
+  return satang.toInt();
+}
+
+String? moneyInputError(String input) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return 'กรุณากรอกจำนวนเงิน';
+  if (trimmed.startsWith('-')) return 'จำนวนเงินต้องไม่ติดลบ';
+
+  final satang = _parseMoneyToSatangBigInt(trimmed);
+  if (satang == null) return 'รูปแบบจำนวนเงินไม่ถูกต้อง';
+  if (satang == BigInt.zero) return 'จำนวนเงินต้องมากกว่า 0';
+  if (satang > BigInt.from(maxMoneyInputSatang)) {
+    return 'จำนวนเงินต้องไม่เกิน ${formatMoney(maxMoneyInputSatang)}';
+  }
+  return null;
+}
+
+String formatMoney(int amountSatang) {
+  final negative = amountSatang < 0;
+  final absolute = BigInt.from(amountSatang).abs();
+  final wholeBaht = absolute ~/ BigInt.from(100);
+  final satang = (absolute % BigInt.from(100)).toInt();
+  final formattedBaht = NumberFormat('#,##0', 'th').format(wholeBaht.toInt());
+  final decimal = satang == 0 ? '' : '.${satang.toString().padLeft(2, '0')}';
+  return '฿${negative ? '-' : ''}$formattedBaht$decimal';
 }
 
 // ---------- Date (Thai, พ.ศ.) ----------
@@ -75,10 +129,10 @@ const categoryEmoji = {
   'อื่น ๆ': '✨',
 };
 
-// เพดานเงินแนะนำต่อวัน (ตามโหมด + level)
-double dailyDepositCap(String mode, int level) {
-  if (mode == 'child') return level >= 2 ? 100 : 50;
-  const table = [100.0, 300.0, 500.0, 1000.0];
+// เพดานเงินแนะนำต่อวัน หน่วยสตางค์ (ตามโหมด + level)
+int dailyDepositCapSatang(String mode, int level) {
+  if (mode == 'child') return level >= 2 ? 10000 : 5000;
+  const table = [10000, 30000, 50000, 100000];
   if (level <= table.length) return table[level - 1];
-  return 1000 * (1 << (level - table.length)).toDouble();
+  return 100000 * (1 << (level - table.length));
 }

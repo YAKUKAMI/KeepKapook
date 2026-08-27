@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import '../utils/format.dart';
+import '../widgets/simulation_notice.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -30,10 +32,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   bool get _canNext {
-    if (step == 0) return _name.text.trim().isNotEmpty;
-    if (step == 1) {
+    if (step == 0) return true;
+    if (step == 1) return _name.text.trim().isNotEmpty;
+    if (step == 2) {
       return _goalName.text.trim().isNotEmpty &&
-          (double.tryParse(_target.text.replaceAll(',', '')) ?? 0) > 0;
+          (parseMoneyToSatang(_target.text) ?? 0) > 0;
     }
     return true;
   }
@@ -50,22 +53,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: [
               Row(
                 children: List.generate(
-                    2,
+                    3,
                     (i) => Expanded(
                           child: Container(
                             height: 6,
                             margin: const EdgeInsets.symmetric(horizontal: 3),
                             decoration: BoxDecoration(
-                              color: i <= step
-                                  ? AppColors.mint
-                                  : Colors.black12,
+                              color:
+                                  i <= step ? AppColors.mint : Colors.black12,
                               borderRadius: BorderRadius.circular(999),
                             ),
                           ),
                         )),
               ),
               const SizedBox(height: 24),
-              Expanded(child: step == 0 ? _step0() : _step1()),
+              Expanded(
+                child: switch (step) {
+                  0 => _disclaimerStep(),
+                  1 => _profileStep(),
+                  _ => _goalStep(),
+                },
+              ),
               Row(
                 children: [
                   if (step > 0)
@@ -77,21 +85,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onPressed: !_canNext
                         ? null
                         : () {
-                            if (step == 0) {
-                              setState(() => step = 1);
+                            if (step < 2) {
+                              setState(() => step++);
                             } else {
                               context.read<AppState>().completeOnboarding(
                                     name: _name.text.trim(),
                                     mode: _mode,
                                     goalName: _goalName.text.trim(),
-                                    target: double.parse(
-                                        _target.text.replaceAll(',', '')),
+                                    targetSatang:
+                                        parseMoneyToSatang(_target.text)!,
                                     targetDate: _date,
                                     emoji: _emoji,
                                   );
                             }
                           },
-                    child: Text(step == 0 ? 'ถัดไป' : 'เริ่มออมเลย'),
+                    child: Text(switch (step) {
+                      0 => 'เข้าใจแล้ว',
+                      1 => 'ถัดไป',
+                      _ => 'เริ่มบันทึกการออม',
+                    }),
                   ),
                 ],
               ),
@@ -102,7 +114,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _step0() => ListView(
+  Widget _disclaimerStep() => ListView(
+        key: const Key('onboarding-disclaimer-page'),
+        children: const [
+          Icon(
+            Icons.savings_outlined,
+            size: 56,
+            color: AppColors.deepGreen,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'ก่อนเริ่มใช้งาน',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'เก็บเงินจริงไว้กับคุณ ใช้ KeepKapook ช่วยติดตามเป้าหมาย',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.mutedText),
+          ),
+          SizedBox(height: 20),
+          SimulationNotice(key: Key('onboarding-disclaimer')),
+        ],
+      );
+
+  Widget _profileStep() => ListView(
         children: [
           const Text('มาทำความรู้จักกัน',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -135,7 +172,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => setState(() => _mode = m),
-                    child: Text(m == SaverMode.child ? '🧒 เด็ก' : '🧑 ผู้ใหญ่'),
+                    child:
+                        Text(m == SaverMode.child ? '🧒 เด็ก' : '🧑 ผู้ใหญ่'),
                   ),
                 ),
               );
@@ -143,12 +181,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-              'โหมดกำหนดเป้าหมายเงินออมแนะนำต่อวัน (บันทึกเงินจริงได้ไม่จำกัด)',
+              'โหมดนี้ใช้กำหนดเป้าหมายเงินออมแนะนำต่อวัน '
+              'ยอดทั้งหมดเป็นตัวเลขที่คุณบันทึกเอง',
               style: TextStyle(fontSize: 11, color: AppColors.mutedText)),
         ],
       );
 
-  Widget _step1() => ListView(
+  Widget _goalStep() => ListView(
         children: [
           const Text('สร้างกระปุกแรก',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -164,8 +203,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             controller: _target,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-                labelText: 'จำนวนเงินเป้าหมาย', prefixText: '฿ '),
+            decoration: InputDecoration(
+              labelText: 'จำนวนเงินเป้าหมาย',
+              prefixText: '฿ ',
+              errorText: _target.text.trim().isEmpty
+                  ? null
+                  : moneyInputError(_target.text),
+            ),
           ),
           const SizedBox(height: 12),
           ListTile(

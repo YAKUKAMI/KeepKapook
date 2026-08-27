@@ -36,7 +36,10 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
+    final amountSatang = parseMoneyToSatang(_amountCtrl.text);
+    final inputError = _amountCtrl.text.trim().isEmpty
+        ? null
+        : moneyInputError(_amountCtrl.text);
 
     Goal? lockedGoal;
     if (_locked) {
@@ -66,6 +69,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               prefixText: '฿ ',
+              errorText: inputError,
               filled: true,
               fillColor: AppColors.white,
               border: OutlineInputBorder(
@@ -92,16 +96,16 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
           ],
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: amount <= 0
+            onPressed: amountSatang == null || amountSatang <= 0
                 ? null
                 : () {
                     final res = app.addSaving(
-                      amount: amount,
+                      amountSatang: amountSatang,
                       goalId: _dest == 'unallocated' ? null : _dest,
                     );
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text(
-                          'บันทึก ${formatMoney(amount)} แล้ว${res.exp > 0 ? ' · +${res.exp} EXP' : ''}'),
+                          'บันทึก ${formatMoney(amountSatang)} แล้ว${res.exp > 0 ? ' · +${res.exp} EXP' : ''}'),
                       backgroundColor: AppColors.deepGreen,
                     ));
                     if (res.completed != null) {

@@ -59,11 +59,11 @@ class GoalCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(formatMoney(goal.currentAmount),
+                Text(formatMoney(goal.currentSatang),
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(width: 6),
-                Text('/ ${formatMoney(goal.targetAmount)}',
+                Text('/ ${formatMoney(goal.targetSatang)}',
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.mutedText)),
               ],
@@ -90,7 +90,7 @@ class GoalCard extends StatelessWidget {
                 Text(
                   done
                       ? 'เสร็จสิ้น'
-                      : 'เหลือ ${formatMoney(goal.remaining)} · ${daysLeft(goal.targetDate)} วัน',
+                      : 'เหลือ ${formatMoney(goal.remainingSatang)} · ${daysLeft(goal.targetDate)} วัน',
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.mutedText),
                 ),

@@ -12,7 +12,7 @@ class LedgerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final entries = [...app.ledger]..sort((a, b) => b.date.compareTo(a.date));
-    final net = app.monthIncome - app.monthExpense;
+    final netSatang = app.monthIncomeSatang - app.monthExpenseSatang;
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -43,16 +43,18 @@ class LedgerScreen extends StatelessWidget {
                 const Text('สรุปเดือนนี้',
                     style: TextStyle(color: AppColors.mutedText)),
                 const SizedBox(height: 4),
-                Text(formatMoney(net),
+                Text(formatMoney(netSatang),
                     style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: net >= 0 ? AppColors.deepGreen : AppColors.error)),
+                        color: netSatang >= 0
+                            ? AppColors.deepGreen
+                            : AppColors.error)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _mini('รายรับ', app.monthIncome, AppColors.mint),
-                    _mini('รายจ่าย', app.monthExpense, AppColors.coral),
+                    _mini('รายรับ', app.monthIncomeSatang, AppColors.mint),
+                    _mini('รายจ่าย', app.monthExpenseSatang, AppColors.coral),
                   ],
                 ),
               ],
@@ -86,7 +88,7 @@ class LedgerScreen extends StatelessWidget {
                     subtitle: Text(
                         '${formatThaiDate(e.date, short: true)}${e.note.isNotEmpty ? ' · ${e.note}' : ''}'),
                     trailing: Text(
-                      '${e.type == LedgerType.income ? '+' : '-'}${formatMoney(e.amount)}',
+                      '${e.type == LedgerType.income ? '+' : '-'}${formatMoney(e.amountSatang)}',
                       style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: e.type == LedgerType.income
@@ -101,12 +103,12 @@ class LedgerScreen extends StatelessWidget {
     );
   }
 
-  Widget _mini(String label, double value, Color color) => Expanded(
+  Widget _mini(String label, int valueSatang, Color color) => Expanded(
         child: Column(
           children: [
             Text(label,
                 style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
-            Text(formatMoney(value),
+            Text(formatMoney(valueSatang),
                 style: TextStyle(fontWeight: FontWeight.bold, color: color)),
           ],
         ),
@@ -158,8 +160,14 @@ class LedgerScreen extends StatelessWidget {
                 controller: amountCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                    labelText: 'จำนวนเงิน', prefixText: '฿ '),
+                onChanged: (_) => setLocal(() {}),
+                decoration: InputDecoration(
+                  labelText: 'จำนวนเงิน',
+                  prefixText: '฿ ',
+                  errorText: amountCtrl.text.trim().isEmpty
+                      ? null
+                      : moneyInputError(amountCtrl.text),
+                ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -183,14 +191,17 @@ class LedgerScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () {
-                    final amt =
-                        double.tryParse(amountCtrl.text.replaceAll(',', '')) ?? 0;
-                    if (amt > 0) {
-                      app.addLedger(type, amt, category, noteCtrl.text.trim());
-                    }
-                    Navigator.pop(ctx);
-                  },
+                  onPressed: (parseMoneyToSatang(amountCtrl.text) ?? 0) <= 0
+                      ? null
+                      : () {
+                          app.addLedger(
+                            type,
+                            parseMoneyToSatang(amountCtrl.text)!,
+                            category,
+                            noteCtrl.text.trim(),
+                          );
+                          Navigator.pop(ctx);
+                        },
                   child: const Text('บันทึก'),
                 ),
               ),

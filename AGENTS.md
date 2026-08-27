@@ -1,63 +1,293 @@
 # AGENTS.md — KeepKapook (Flutter)
 
-Context สำหรับ AI coding agent (Codex ฯลฯ) ที่มาทำงานต่อในโปรเจกต์นี้.
+Context สำหรับ AI coding agent (Codex, Claude ฯลฯ) ที่มาทำงานต่อในโปรเจกต์นี้
+อ่านให้จบก่อนแตะโค้ด โดยเฉพาะหัวข้อ **ห้ามทำ** และ **Definition of Done**
 
-## ภาพรวม
+---
+
+## 1. ภาพรวม
+
 KeepKapook = แอปสร้างนิสัยการออมเงินสำหรับวัยรุ่น/ผู้เริ่มออม (โค้ชการออม)
-พอร์ตมาจากเวอร์ชันเว็บ (Next.js). **ไม่เชื่อมบัญชีธนาคาร ไม่ถือเงินจริง** — ทุกยอดเป็นข้อมูลที่ผู้ใช้บันทึกเอง (tracking/mock).
+พอร์ตมาจากเวอร์ชันเว็บ (Next.js) ที่ deploy บน Firebase (project `keepkapook-8fa2d2`) ใช้เป็นตัวโปรโมท
 
-Positioning: ไม่แข่ง MAKE by KBank เรื่องธุรกรรมจริง แต่เน้น "วันนี้ควรออมเท่าไร / ไม่เลิกกลางทาง / ถึงเป้าเมื่อไร" + gamification. ภายหลังผู้ใช้ให้เพิ่มฟีเจอร์แบบ MAKE (รายรับจ่าย, pocket, โอน, ล็อก, แชร์) แบบ tracking.
+**ไม่เชื่อมบัญชีธนาคาร ไม่ถือเงินจริง** — ทุกยอดคือข้อมูลที่ผู้ใช้บันทึกเอง (tracking/mock)
+ฟีเจอร์ "โอน / ล็อกเงิน / ออมด้วยกัน / ถอนออก" เป็นการ **จำลอง** ทั้งหมด ไม่มีเงินเคลื่อนไหวจริง
 
-## Stack
-- Flutter 3.47 / Dart 3
-- State: `provider` (ChangeNotifier) — `lib/state/app_state.dart`
-- Persist: `shared_preferences` (JSON ทั้ง state)
-- กราฟ: `fl_chart` · ฟอนต์: `google_fonts` (Prompt) · `intl` · `uuid` · `image_picker`
+**Positioning:** ไม่แข่ง MAKE by KBank เรื่องธุรกรรมจริง
+จุดขายคือคำถาม 3 ข้อ — *"วันนี้ควรออมเท่าไร / จะไม่เลิกกลางทางยังไง / จะถึงเป้าเมื่อไร"* + gamification
+ทุกฟีเจอร์ใหม่ควรตอบข้อใดข้อหนึ่งได้ ถ้าตอบไม่ได้ ให้ตั้งคำถามก่อนลงมือ
 
-## โครงสร้าง
+---
+
+## 2. Stack
+
+| ส่วน | ใช้อะไร |
+|---|---|
+| Framework | Flutter 3.47.1 / Dart 3.13.1 (`pubspec.yaml`: Dart `>=3.3.0 <4.0.0`) |
+| State | `provider` (ChangeNotifier) — `lib/state/app_state.dart` |
+| Persist | `shared_preferences` (serialize state ทั้งก้อนเป็น JSON) |
+| กราฟ | `fl_chart` |
+| ฟอนต์ | `google_fonts` (Prompt) — ดูข้อควรระวังใน §8 |
+| อื่นๆ | `intl`, `uuid`, `image_picker`, `file_selector`, `share_plus`, `package_info_plus` |
+
+ก่อนใช้ API ใดๆ ให้เช็ก constraint ใน `pubspec.yaml` จริง อย่าเดาจากเวอร์ชันในตารางนี้
+
+---
+
+## 3. โครงสร้าง
+
 ```
 lib/
 ├─ main.dart                 shell: onboarding gate + bottom nav 5 แท็บ + FAB
 ├─ theme/app_theme.dart      สีแบรนด์ (AppColors) + ThemeData
-├─ models/models.dart        Goal, SavingTransaction, LedgerEntry, Quest, AchievementBadge, AppUser + enums
+├─ models/models.dart        Goal, SavingTransaction, LedgerEntry, Quest,
+│                            AchievementBadge, AppUser + enums
 ├─ state/app_state.dart      AppState (ChangeNotifier): ทุก action + persist + _initEmpty()
-├─ utils/format.dart         money/date(พ.ศ.)/level-EXP/เพดาน/หมวดหมู่
+├─ state/migrations.dart     schemaVersion + migration แบบต่อขั้น v1→v2→v3
+├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
+├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
+├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
-├─ widgets/                  goal_card, celebration
+├─ widgets/                  goal_card, celebration, simulation_notice
 └─ screens/                  dashboard, goals, goal_detail, new_goal, add_saving,
                              scan_slip, quests, achievements, history, unallocated,
                              settings, ledger, onboarding
-test/smoke_test.dart         9 tests: boot→onboarding + ทุกหน้าจอ build ไม่ crash
+test/
+├─ smoke_test.dart           boot→onboarding + ทุกหน้าจอ build ไม่ crash
+├─ models_serialization_test.dart
+├─ migrations_test.dart
+├─ app_state_persistence_test.dart
+├─ money_test.dart
+├─ coach_test.dart
+├─ backup_test.dart
+└─ app_state_money_test.dart
 ```
 
-## ฟีเจอร์ที่ทำแล้ว (Phase 1-4)
-- กระปุกเป้าหมาย (goal): สร้าง/ดู/ลบ, progress, milestone EXP, overflow→ยังไม่จัดสรร
-- Gamification: EXP/level (สูตรใน format.dart), quests (รับรางวัล), badges (auto-unlock), celebration dialog
-- Dashboard: hero+EXP bar, ยอดรวม vs เป้าหมาย, กราฟ 7 วัน, การ์ดรายรับจ่าย
-- Onboarding wizard (ชื่อ+โหมด→กระปุกแรก) — โผล่เมื่อ `!user.onboarded`
-- Recovery Plan (goal detail): ตามแผนไม่ทัน→ออมเพิ่ม/เลื่อนวัน/ลดเป้า
-- Scan slip: image_picker + กรอกเอง (ยังไม่มี OCR อัตโนมัติ)
-- **MAKE-style**: รายรับ-รายจ่าย (ledger + หมวดหมู่ + สรุปเดือน), Cloud Pocket ยืดหยุ่น (flexible), โอนระหว่างกระปุก, ล็อกเงิน (7/30/90 วัน), ออมด้วยกัน/แชร์ (mock members), ถอนออก
-- **ไม่มีข้อมูล mock** — เริ่มว่างเปล่าผ่าน onboarding. Settings มี "ล้างข้อมูลทั้งหมด"
+**หนี้โครงสร้างที่รู้ตัว:** `models.dart` และ `app_state.dart` เป็น god file
+ถ้าไฟล์ไหนเกิน ~800 บรรทัด ให้แตกก่อนเพิ่มโค้ดใหม่
+(`models/` แยกตาม entity, `state/` แยกเป็น mixin/part ตามโดเมน: goal / ledger / gamification)
 
-## รัน / test / build
+---
+
+## 4. Data & Persistence — อ่านก่อนแตะ model ทุกครั้ง
+
+นี่คือจุดที่พังแล้วเจ็บที่สุด เพราะพังแบบเงียบและกู้ไม่ได้
+
+- SharedPreferences key: `keepkapook_state_v1`
+- Corrupt backup key: `keepkapook_state_v1_corrupt_backup`
+- Pre-import backup key: `keepkapook_state_v1_pre_import_backup` — เก็บ state ปัจจุบันก่อนกู้คืนทับทุกครั้ง
+- รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 2` และ migration framework ที่ `lib/state/migrations.dart`
+
+ตัวอย่างย่อของ JSON ที่ persist จริงในปัจจุบัน:
+
+```json
+{
+  "schemaVersion": 2,
+  "user": {"name": "...", "emoji": "🐷", "exp": 0,
+    "consistencyWeeks": 0, "mode": "adult", "onboarded": true},
+  "goals": [{
+    "id": "g-...", "name": "...", "description": "",
+    "targetSatang": 1000000, "currentSatang": 50000,
+    "startDate": "2026-08-24T00:00:00.000", "targetDate": "2027-08-24T00:00:00.000",
+    "category": "other", "priority": "medium", "emoji": "🎯",
+    "themeColor": 4283615141, "status": "active", "completedDate": null,
+    "flexible": false, "locked": false, "lockUntil": null, "shared": false, "members": []
+  }],
+  "transactions": [{"id": "...", "type": "deposit", "amountSatang": 50000,
+    "date": "2026-08-24T00:00:00.000", "goalId": "g-...", "note": "", "expAwarded": 10, "isPossibleDuplicate": false}],
+  "quests": [{"id": "q-deposit", "title": "...", "description": "...", "period": "daily", "target": 1, "progress": 0, "expReward": 15, "claimed": false}],
+  "badges": [{"id": "b-first-drop", "name": "...", "description": "...", "emoji": "💧", "condition": "...", "unlocked": false, "progress": 0.0}],
+  "ledger": [{"id": "...", "type": "income", "amountSatang": 100000, "category": "อื่น ๆ", "note": "", "date": "2026-08-24T00:00:00.000"}],
+  "unallocatedSatang": 0
+}
+```
+
+- สถานะการโหลดปัจจุบัน: ข้อมูลไม่มี `schemaVersion` ถือเป็น v1 แล้วเขียนกลับพร้อม version; ถ้า parse ไม่ผ่านหรือ version ใหม่กว่าแอป จะสำรอง raw JSON และแสดง `MaterialBanner` ภาษาไทยก่อนใช้ state ว่าง
+- **ทุกครั้งที่เพิ่ม/เปลี่ยน/ลบ field ใน model ต้องเพิ่ม `schemaVersion` และเขียน migration**
+  ค่า version ปัจจุบันและ migration steps อยู่ใน `lib/state/migrations.dart`
+- `fromJson` ทุกตัวต้องทนข้อมูลเก่า: field ที่เพิ่มใหม่ต้องมี default ไม่ใช่ `!`
+- โหลดตอนเปิดแอปต้องอยู่ใน try/catch — parse ไม่ผ่านห้าม crash ให้ fallback + แจ้งผู้ใช้ ไม่ใช่ล้างข้อมูลเงียบๆ
+
+### กฎเรื่องจำนวนเงิน
+
+- เก็บเป็น **`int` หน่วยสตางค์** แปลงเป็นบาทตอนแสดงผลเท่านั้น
+- ห้ามใช้ `double` กับยอดเงิน — การโอน/แบ่งกระปุก/overflow จะสะสม error จนยอดเพี้ยนแบบหาไม่เจอ
+- field ปัจจุบันคือ `amountSatang`, `targetSatang`, `currentSatang`, `unallocatedSatang` และ `overflowSatang`
+- Input เงินต้องผ่าน `parseMoneyToSatang()` ตั้งแต่จุดรับค่า และต้องไม่ติดลบ/ไม่เกิน **฿100,000,000 ต่อรายการ** (`10,000,000,000` สตางค์)
+- กฎปัดเศษเดียวทั้ง input และ migration v1→v2 คือ **ปัดครึ่งขึ้น (half-up)**: อ่านทศนิยมบาทหลักที่ 3 ถ้า `>= 5` ให้เพิ่ม 1 สตางค์ เช่น `1.004 → 100`, `1.005 → 101`, `2.675 → 268` สตางค์ โดยห้ามคำนวณผ่าน floating point
+- migration v1→v2 แปลง field เงินหน่วยบาทเดิมทุกตำแหน่งเป็น field `...Satang`; ข้อมูลที่ไม่มี `schemaVersion` ถือเป็น v1 และต้องเปิดใช้ได้โดยยอดไม่เปลี่ยน
+
+### Export / Import
+
+- ไฟล์สำรองเป็น JSON state ทั้งก้อน พร้อม `backupFormat: "keepkapook-backup"`, `schemaVersion`, `exportedAt` (UTC) และ `appVersion`
+- ชื่อไฟล์ `keepkapook-backup-YYYYMMDD.json`; ผู้ใช้เป็นคนเลือกบันทึก/แชร์เอง แอปไม่มี backend และไม่อัปโหลดไฟล์อัตโนมัติ
+- Import ต้อง validate ตัวระบุไฟล์ + metadata + โครงสร้าง state → ผ่าน migration → แสดง preview → ขอคำยืนยัน → สำรอง state ปัจจุบันใน pre-import key → จึงเขียนทับ
+- ไฟล์ JSON พัง, ไม่ใช่ backup ของ KeepKapook, ข้อมูลไม่ครบ หรือ schema ใหม่กว่า ต้องหยุดก่อนเขียนและแจ้งภาษาไทย
+
+### กฎเรื่องวันและเวลา
+
+- เก็บ timestamp เป็น **UTC** เสมอ แสดงผลเป็น local
+- นิยาม "วัน" = local midnight (Asia/Bangkok) ใช้ helper ตัวเดียวกันทั้งแอป ห้ามคำนวณ `DateTime.now().difference()` ตรงๆ ในหน้าจอ
+- ฟีเจอร์ที่ผูกกับวัน: กราฟ 7 วัน, streak, ล็อกเงิน 7/30/90 วัน, quest รายวัน
+- ล็อกเงินต้องเทียบกับ `unlockAt` ที่บันทึกไว้ ไม่ใช่นับถอยหลังจากเวลาปัจจุบัน (กันผู้ใช้หมุนนาฬิกาเครื่อง)
+
+---
+
+## 5. ฟีเจอร์ที่ทำแล้ว (Phase 1-4)
+
+- **กระปุกเป้าหมาย (goal):** สร้าง / ดู / ลบ, progress, milestone EXP, overflow → ยังไม่จัดสรร
+- **Gamification:** EXP/level (สูตรใน `format.dart`), quests (รับรางวัล), badges (auto-unlock), celebration dialog
+- **Dashboard:** hero + EXP bar, ยอดรวม vs เป้าหมาย, กราฟ 7 วัน, การ์ดรายรับจ่าย
+- **Onboarding wizard:** ชื่อ + โหมด → กระปุกแรก (โผล่เมื่อ `!user.onboarded`)
+- **Recovery Plan** (goal detail): ตามแผนไม่ทัน → ออมเพิ่ม / เลื่อนวัน / ลดเป้า
+- **Scan slip:** image_picker + กรอกเอง (ยังไม่มี OCR อัตโนมัติ)
+- **MAKE-style (จำลองทั้งหมด):** รายรับ-รายจ่าย (ledger + หมวดหมู่ + สรุปเดือน), Cloud Pocket ยืดหยุ่น, โอนระหว่างกระปุก, ล็อกเงิน 7/30/90 วัน, ออมด้วยกัน/แชร์ (mock members), ถอนออก
+- **ไม่มีข้อมูล mock** — เริ่มว่างเปล่าผ่าน onboarding, Settings มี "ล้างข้อมูลทั้งหมด"
+- **สำรอง/กู้คืนข้อมูล:** export JSON ออกนอกแอปและ import พร้อม preview/ยืนยัน โดยทำงานบน web และ mobile
+
+---
+
+## 6. รัน / test / build
+
 ```bash
 flutter pub get
 flutter run -d chrome        # หรือ device/emulator
-flutter test                 # 9 smoke tests
-flutter analyze lib          # ไม่มี error (เหลือแค่ info: withOpacity deprecated)
-flutter build web            # ✓ ผ่าน (ใช้ verify compile — ไม่มี Android SDK ในเครื่องนี้)
+
+flutter analyze lib          # ต้อง 0 error
+flutter test                 # ต้องเขียวทั้งหมด
+flutter build web            # ใช้ verify compile (เครื่อง dev ยังไม่มี Android SDK)
 ```
 
-## ยังไม่ได้ทำ / ข้อควรระวัง
-- **OCR อ่านสลิปอัตโนมัติ** — google_mlkit_text_recognition เป็น **mobile-only** จะพัง `flutter build web` → เพิ่มแบบ conditional import ตอน build มือถือ
-- ยังไม่มี Android SDK/Xcode ในเครื่อง dev → ยังไม่เคย build APK/iOS
-- Store-ready ยังขาด: app icon, `applicationId` (ยัง `com.example.keepkapook`), signing, privacy policy, disclaimer "ไม่ใช่แอปธนาคาร", label ฟีเจอร์ mock (โอน/ล็อก/แชร์) ว่าเป็น simulate
-- Goal Album (รูป), edit goal, insight กราฟหมวดรายจ่าย — ยังไม่ทำ
+### Definition of Done — บังคับทุกงาน
 
-## conventions
-- UI/ข้อความเป็นภาษาไทย · เงินรูปแบบ `฿12,500` (formatMoney) · วันที่ พ.ศ. (formatThaiDate)
-- ทุก action ที่แก้ state ต้อง `_save()` + `notifyListeners()`
-- ระวัง null-promotion ใน closure (ใช้ `x!` หรือแยก method)
+งานถือว่าเสร็จก็ต่อเมื่อครบทุกข้อ ห้ามรายงานว่าเสร็จถ้าข้อใดข้อหนึ่งไม่ผ่าน:
+
+1. `flutter analyze lib` — 0 error (warning ใหม่ก็ไม่รับ)
+2. `flutter test` — เขียวทั้งหมด
+3. `flutter build web` — ผ่าน
+4. ถ้าแตะ logic ที่คำนวณตัวเลข (เงิน, EXP, วัน, แผน) → **ต้องมี unit test ใหม่ที่ fail ก่อนแก้และ pass หลังแก้**
+5. ถ้าแตะ model/persist → บอกใน summary ว่า schemaVersion เปลี่ยนเป็นเท่าไรและ migration อยู่ไฟล์ไหน
+6. สรุปท้ายงาน: แก้ไฟล์อะไร / ตัดสินใจอะไรที่ไม่ชัดในโจทย์ / อะไรที่ยังไม่ได้ทำ
+
+---
+
+## 7. ห้ามทำ (hard rules)
+
+- ❌ **ห้ามเปลี่ยน `applicationId` / bundle id** โดยไม่ได้รับคำสั่งชัดเจน (เปลี่ยนหลังปล่อยสโตร์ไม่ได้)
+- ❌ **ห้ามเพิ่ม dependency ที่ไม่รองรับ web** โดยไม่ทำ conditional import + stub — จะพัง `flutter build web` ซึ่งเป็น gate เดียวที่เรามีตอนนี้ (เช่น `google_mlkit_text_recognition` เป็น mobile-only)
+- ❌ **ห้ามแก้/ลบ field ใน model โดยไม่เขียน migration** (§4)
+- ❌ **ห้ามใส่ข้อมูล mock/seed กลับเข้าไปในแอป** — แอปต้องเริ่มว่างเปล่าผ่าน onboarding เสมอ
+- ❌ **ห้ามใช้ `double` กับยอดเงิน**
+- ❌ **ห้ามลบหรือลดความชัดของข้อความ disclaimer / label "จำลอง"** บนฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก (§10)
+- ❌ ห้าม refactor ใหญ่พ่วงมากับงานฟีเจอร์ — แยกคนละรอบ
+- ❌ ห้าม commit ไฟล์ signing key, `.env`, หรือ google-services.json ที่มี secret
+
+---
+
+## 8. Conventions
+
+### ภาษาและรูปแบบ
+- UI/ข้อความทั้งหมดเป็นภาษาไทย
+- เงิน: `฿12,500` ผ่าน `formatMoney()` เท่านั้น ห้ามต่อ string เอง
+- วันที่: พ.ศ. ผ่าน `formatThaiDate()` เท่านั้น
 - ชื่อ model `AchievementBadge` (เลี่ยงชนกับ `Badge` ของ material)
-- เวอร์ชันเว็บ deploy อยู่ที่ Firebase (project keepkapook-8fa2d2) เป็นตัวโปรโมท
+
+### State
+- ทุก action ที่แก้ state ต้องจบด้วย `_save()` + `notifyListeners()`
+- สถานะปัจจุบันของ `_save()`: **ยังไม่มี debounce และไม่มี try/catch/error reporting** โดยเรียก `SharedPreferences.getInstance()` แล้ว `setString()` ตรงๆ
+- ระวัง null-promotion ใน closure (ใช้ `x!` หรือแยกเป็น method)
+- Business logic อยู่ใน `utils/` หรือ `AppState` เท่านั้น — หน้าจอห้ามคำนวณเงิน/วัน/EXP เอง (ไม่งั้นเทสไม่ได้)
+
+### UI
+- ใช้ `.withValues(alpha: x)` ไม่ใช่ `.withOpacity(x)` (deprecated)
+- ทดสอบด้วย text scale ใหญ่ (1.3x) — ตัวเลขเงินยาว ล้นง่าย
+- `google_fonts` โหลดฟอนต์จากเน็ตครั้งแรก → **ควร bundle Prompt เข้า `assets/fonts/` ให้เปิดแอปครั้งแรกแบบออฟไลน์ได้** (P2)
+
+### Git
+- 1 งาน = 1 branch = 1 PR, prefix: `feat/`, `fix/`, `chore/`, `refactor/`
+- commit message ภาษาอังกฤษ imperative สั้นๆ เช่น `feat: add saving streak counter`
+
+---
+
+## 9. Recipes — จะทำ X ต้องแตะไฟล์ไหน
+
+**เพิ่มหน้าจอใหม่**
+`screens/xxx_screen.dart` → route/nav ใน `main.dart` → (ถ้ามีปุ่มเข้า) หน้าจอต้นทาง → เพิ่มเคสใน `test/smoke_test.dart`
+
+**เพิ่ม action ที่แก้ข้อมูล**
+เพิ่ม method ใน `state/app_state.dart` (จบด้วย `_save()` + `notifyListeners()`) → ถ้ามีการคำนวณ ให้แยก pure function ไป `utils/` → เขียน unit test ของ pure function นั้น → ต่อ UI
+
+**เพิ่ม field ใน model**
+`models/models.dart` (ใส่ default ใน `fromJson`) → bump `schemaVersion` → เขียน migration → รันแอปด้วยข้อมูลเก่าดูว่าไม่พัง → unit test round-trip `toJson`/`fromJson`
+
+**เพิ่ม schema v3 (หรือ version ถัดไป)**
+เพิ่ม `currentSchemaVersion` ใน `state/migrations.dart` → เขียน `_migrateV2ToV3` → เพิ่ม `2: _migrateV2ToV3` ใน `_migrationSteps` (key คือ version ต้นทาง) → เขียน unit test migrate จาก v2 และทดสอบ migrate ต่อขั้นจาก v1 ถึง version ล่าสุด
+
+**เพิ่ม quest หรือ badge**
+เพิ่ม definition + เงื่อนไข unlock (เป็น pure function) → unit test เงื่อนไข → เช็กว่า celebration dialog ไม่เด้งซ้ำ
+
+**pattern ของ action (ลอกได้เลย)**
+```dart
+Future<void> addSaving(String goalId, int amountSatang, {DateTime? at}) async {
+  final goal = _goals.firstWhereOrNull((g) => g.id == goalId);
+  if (goal == null) return;
+  // 1) คำนวณด้วย pure function ที่เทสได้
+  final result = applySaving(goal, amountSatang, at ?? DateTime.now().toUtc());
+  // 2) อัปเดต state
+  _goals[_goals.indexOf(goal)] = result.goal;
+  _unallocatedSatang += result.overflowSatang;
+  _transactions.add(result.tx);
+  // 3) side effect ของ gamification
+  _grantExp(result.exp);
+  // 4) เสมอ
+  await _save();
+  notifyListeners();
+}
+```
+
+---
+
+## 10. Backlog
+
+### P0 — ต้องเสร็จก่อนปล่อยผู้ใช้จริง
+- [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v2)
+- [x] เปลี่ยนยอดเงินเป็น `int` สตางค์ + migration v1→v2
+- [x] Export / Import ข้อมูลเป็นไฟล์ JSON พร้อม validate, migration, preview และ pre-import backup
+- [x] Disclaimer "ไม่ใช่แอปธนาคาร ไม่มีเงินจริง" ใน onboarding + Settings
+      และ label "จำลอง" บนหน้าจอ โอน / ล็อก / ออมด้วยกัน / ถอนออก
+- [ ] Unit test ของ logic การเงิน: `format.dart` (EXP/level/เพดาน), `coach.dart` (planStatus, recoveryOptions), AppState (โอน, ล็อก, overflow→unallocated, ถอน)
+- [ ] `applicationId` จริง (เลิกใช้ `com.example.keepkapook`) + app icon + signing
+- [ ] ลอง `flutter build apk` ให้ผ่านสักครั้ง (ยังไม่เคยทำเลย)
+- [ ] Privacy policy + นโยบายรูปสลิป (มี PII: เลขบัญชี/ชื่อ) — ไม่อัปโหลดออกนอกเครื่อง, ขอ permission ให้ถูก
+
+### P1 — ฟีเจอร์ที่ควรมี เรียงตามผลต่อ retention
+- [ ] **Streak + ปฏิทินการออม** — แกน "ไม่เลิกกลางทาง" ที่ยังหายไป ถูกและตรง positioning ที่สุด
+- [ ] **Local notification เตือนออม** (`flutter_local_notifications`, ทำงาน offline) — habit app ที่ไม่เตือนคือรอให้ผู้ใช้ลืม
+- [ ] **แก้ไขเป้าหมาย / แก้-ลบรายการย้อนหลัง + undo** — ตอนนี้กรอกผิดแล้วแก้ไม่ได้
+- [ ] **Insight รายจ่ายที่แปลงเป็นเวลา** — ไม่ใช่แค่ pie chart แต่ "ลดกาแฟสัปดาห์ละ 2 แก้ว = ถึงเป้าเร็วขึ้น 12 วัน" ← จุดที่ MAKE ไม่ทำ
+- [ ] **Challenge การออม** — ออม 365 วันทวีคูณ / สัปดาห์ไม่ใช้เงิน / เก็บเศษสตางค์ (ต่อยอด quest+badge ที่มีอยู่)
+- [ ] **สรุปรายสัปดาห์-เดือน แชร์เป็นรูป** — growth loop ที่ไม่ต้องซื้อโฆษณา
+- [ ] debounce + error handling ใน `_save()`
+- [ ] CI (GitHub Actions): analyze + test + build web ทุก PR
+
+### P2
+- [ ] Quick add / home screen widget + ปุ่มจำนวนที่ใช้บ่อย (20/50/100)
+- [ ] PIN / biometric lock
+- [ ] Cloud sync + login ผ่าน Firebase (ทำหลังมี export แล้ว)
+- [ ] Goal Album (รูปเป้าหมาย)
+- [ ] bundle ฟอนต์ Prompt เข้า assets
+- [ ] crash reporting + analytics (รู้ว่าผู้ใช้เลิกตรงไหน)
+- [ ] แตก god file `models.dart` / `app_state.dart`
+- [ ] OCR อ่านสลิปอัตโนมัติ — `google_mlkit_text_recognition` mobile-only ต้อง conditional import + stub สำหรับ web ไม่งั้น `flutter build web` พัง
+
+### ไม่ทำ (out of scope)
+- เชื่อมบัญชีธนาคารจริง / ถือเงินจริง / e-wallet — คนละ regulatory league
+- แข่งกับ MAKE เรื่องความเร็วธุรกรรม
+
+---
+
+## 11. เมื่อไม่แน่ใจ
+
+- โจทย์กำกวมเรื่อง **เงิน วันที่ หรือ migration** → หยุดถาม อย่าเดา
+- โจทย์กำกวมเรื่อง UI/ถ้อยคำ → เลือกทางที่เรียบง่ายที่สุด ทำให้เสร็จ แล้วบอกในสรุปว่าตัดสินใจอะไรไป
+- เจอบั๊กนอกขอบเขตงาน → จดลง Backlog §10 อย่าแก้พ่วง

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import '../utils/format.dart';
 
 class NewGoalScreen extends StatefulWidget {
   const NewGoalScreen({super.key});
@@ -131,16 +132,16 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
                 Navigator.pop(context);
                 return;
               }
-              final target =
-                  double.tryParse(_target.text.replaceAll(',', '')) ?? 0;
-              if (target <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('กรุณากรอกจำนวนเงินเป้าหมาย')));
+              final targetSatang = parseMoneyToSatang(_target.text);
+              if (targetSatang == null || targetSatang <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(moneyInputError(_target.text) ??
+                        'กรุณากรอกจำนวนเงินเป้าหมาย')));
                 return;
               }
               app.addGoal(
                 name: _name.text.trim(),
-                target: target,
+                targetSatang: targetSatang,
                 targetDate: _date,
                 emoji: _emoji,
                 category: _cat,
@@ -163,12 +164,16 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
         const SizedBox(height: 6),
         TextField(
           controller: c,
+          onChanged: number ? (_) => setState(() {}) : null,
           keyboardType: number
               ? const TextInputType.numberWithOptions(decimal: true)
               : TextInputType.text,
           decoration: InputDecoration(
             hintText: hint,
             prefixText: prefix,
+            errorText: number && c.text.trim().isNotEmpty
+                ? moneyInputError(c.text)
+                : null,
             filled: true,
             fillColor: AppColors.white,
             border: OutlineInputBorder(

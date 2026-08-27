@@ -50,53 +50,77 @@ class _HomeShellState extends State<HomeShell> {
         body: Center(child: CircularProgressIndicator(color: AppColors.mint)),
       );
     }
+
+    late final Widget content;
     if (!app.user.onboarded) {
-      return const OnboardingScreen();
+      content = const OnboardingScreen();
+    } else {
+      final pages = [
+        const _TitledScaffold(title: 'KeepKapook', child: DashboardScreen()),
+        const GoalsScreen(),
+        const QuestsScreen(),
+        const HistoryScreen(),
+        const SettingsScreen(),
+      ];
+
+      content = Scaffold(
+        body: SafeArea(child: pages[_index]),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: AppColors.coral,
+          onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const AddSavingScreen())),
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          backgroundColor: AppColors.white,
+          indicatorColor: AppColors.mint.withOpacity(0.15),
+          destinations: const [
+            NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard),
+                label: 'ภาพรวม'),
+            NavigationDestination(
+                icon: Icon(Icons.savings_outlined),
+                selectedIcon: Icon(Icons.savings),
+                label: 'กระปุก'),
+            NavigationDestination(
+                icon: Icon(Icons.emoji_events_outlined),
+                selectedIcon: Icon(Icons.emoji_events),
+                label: 'ภารกิจ'),
+            NavigationDestination(
+                icon: Icon(Icons.history),
+                label: 'ประวัติ'),
+            NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
+                label: 'ตั้งค่า'),
+          ],
+        ),
+      );
     }
 
-    final pages = [
-      const _TitledScaffold(title: 'KeepKapook', child: DashboardScreen()),
-      const GoalsScreen(),
-      const QuestsScreen(),
-      const HistoryScreen(),
-      const SettingsScreen(),
-    ];
+    final loadErrorMessage = app.loadErrorMessage;
+    if (loadErrorMessage == null) return content;
 
-    return Scaffold(
-      body: SafeArea(child: pages[_index]),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.coral,
-        onPressed: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AddSavingScreen())),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        backgroundColor: AppColors.white,
-        indicatorColor: AppColors.mint.withOpacity(0.15),
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard),
-              label: 'ภาพรวม'),
-          NavigationDestination(
-              icon: Icon(Icons.savings_outlined),
-              selectedIcon: Icon(Icons.savings),
-              label: 'กระปุก'),
-          NavigationDestination(
-              icon: Icon(Icons.emoji_events_outlined),
-              selectedIcon: Icon(Icons.emoji_events),
-              label: 'ภารกิจ'),
-          NavigationDestination(
-              icon: Icon(Icons.history),
-              label: 'ประวัติ'),
-          NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings),
-              label: 'ตั้งค่า'),
-        ],
-      ),
+    return Column(
+      children: [
+        SafeArea(
+          bottom: false,
+          child: MaterialBanner(
+            content: Text(loadErrorMessage),
+            backgroundColor: AppColors.warmYellow,
+            actions: [
+              TextButton(
+                onPressed: app.clearLoadErrorMessage,
+                child: const Text('รับทราบ'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: content),
+      ],
     );
   }
 }

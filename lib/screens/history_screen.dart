@@ -70,7 +70,7 @@ class HistoryScreen extends StatelessWidget {
                               Text(g.name,
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w600)),
-                              Text('🎉 ${formatMoney(g.targetAmount)}',
+                              Text('🎉 ${formatMoney(g.targetSatang)}',
                                   style: const TextStyle(
                                       fontSize: 12,
                                       color: AppColors.mutedText)),
@@ -105,7 +105,7 @@ class HistoryScreen extends StatelessWidget {
                     style: const TextStyle(fontSize: 12),
                   ),
                   trailing: Text(
-                    '${t.type == TxType.withdraw ? '-' : '+'}${formatMoney(t.amount)}',
+                    '${t.type == TxType.withdraw ? '-' : '+'}${formatMoney(t.amountSatang)}',
                     style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppColors.deepGreen),

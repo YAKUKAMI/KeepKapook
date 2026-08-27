@@ -32,7 +32,7 @@ void showCelebration(BuildContext context, Goal goal, int exp) {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _stat('ยอดเป้าหมาย', formatMoney(goal.targetAmount)),
+                _stat('ยอดเป้าหมาย', formatMoney(goal.targetSatang)),
                 _stat('ได้รับ', '+$exp EXP'),
               ],
             ),

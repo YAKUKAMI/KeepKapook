@@ -18,7 +18,9 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final lp = levelProgress(app.user.exp);
-    final overall = app.grandTarget <= 0 ? 0.0 : app.totalSaved / app.grandTarget;
+    final overall = app.grandTargetSatang <= 0
+        ? 0.0
+        : app.totalSavedSatang / app.grandTargetSatang;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -113,14 +115,15 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       const Text('ยอดออมรวม',
                           style: TextStyle(color: AppColors.mutedText)),
-                      Text(formatMoney(app.totalSaved),
+                      Text(formatMoney(app.totalSavedSatang),
                           style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
                               color: AppColors.deepGreen)),
                     ],
                   ),
-                  Text('จากเป้าหมาย ${formatMoney(app.grandTarget)}',
+                  Text(
+                      'จากเป้าหมาย ${formatMoney(app.grandTargetSatang)}',
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.mutedText)),
                 ],
@@ -145,7 +148,8 @@ class DashboardScreen extends StatelessWidget {
           children: [
             _stat('กระปุกกำลังออม', '${app.activeGoals.length}', AppColors.mint),
             const SizedBox(width: 12),
-            _stat('ยังไม่จัดสรร', formatMoney(app.unallocated), AppColors.coral),
+            _stat('ยังไม่จัดสรร', formatMoney(app.unallocatedSatang),
+                AppColors.coral),
           ],
         ),
         const SizedBox(height: 16),
@@ -167,13 +171,13 @@ class DashboardScreen extends StatelessWidget {
                               fontWeight: FontWeight.w600, fontSize: 13)),
                       const SizedBox(height: 4),
                       Text(
-                          'คงเหลือ ${formatMoney(app.monthIncome - app.monthExpense)}',
+                          'คงเหลือ ${formatMoney(app.monthIncomeSatang - app.monthExpenseSatang)}',
                           style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: AppColors.deepGreen)),
                       Text(
-                          'รับ ${formatMoney(app.monthIncome)} · จ่าย ${formatMoney(app.monthExpense)}',
+                          'รับ ${formatMoney(app.monthIncomeSatang)} · จ่าย ${formatMoney(app.monthExpenseSatang)}',
                           style: const TextStyle(
                               fontSize: 11, color: AppColors.mutedText)),
                     ],
@@ -265,7 +269,8 @@ class _Chart extends StatelessWidget {
               t.date.year == d.year &&
               t.date.month == d.month &&
               t.date.day == d.day)
-          .fold(0.0, (s, t) => s + t.amount);
+          .fold<int>(0, (sum, transaction) =>
+              sum + transaction.amountSatang);
     }).toList();
 
     return LineChart(
@@ -282,7 +287,7 @@ class _Chart extends StatelessWidget {
           LineChartBarData(
             spots: [
               for (var i = 0; i < totals.length; i++)
-                FlSpot(i.toDouble(), totals[i]),
+                FlSpot(i.toDouble(), totals[i].toDouble()),
             ],
             isCurved: true,
             color: AppColors.deepGreen,

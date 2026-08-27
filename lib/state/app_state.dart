@@ -4,15 +4,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../utils/format.dart';
+import 'backup.dart';
+import 'migrations.dart';
 
-const _storageKey = 'keepkapook_state_v1';
+const appStateStorageKey = 'keepkapook_state_v1';
+const appStateCorruptBackupKey = '${appStateStorageKey}_corrupt_backup';
+const appStatePreImportBackupKey = '${appStateStorageKey}_pre_import_backup';
 const _uuid = Uuid();
+
+Map<String, dynamic> _jsonObject(Object? value) {
+  if (value == null) return <String, dynamic>{};
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return Map<String, dynamic>.from(value);
+  throw const FormatException('ข้อมูลต้องเป็น JSON object');
+}
+
+List<T> _jsonList<T>(
+  Object? value,
+  T Function(Map<String, dynamic>) fromJson,
+) {
+  if (value == null) return <T>[];
+  if (value is! List) throw const FormatException('ข้อมูลต้องเป็น JSON array');
+  return value.map((entry) => fromJson(_jsonObject(entry))).toList();
+}
 
 class SavingResult {
   final int exp;
   final Goal? completed;
-  final double overflow;
-  SavingResult(this.exp, this.completed, this.overflow);
+  final int overflowSatang;
+  SavingResult(this.exp, this.completed, this.overflowSatang);
 }
 
 class AppState extends ChangeNotifier {
@@ -22,62 +42,145 @@ class AppState extends ChangeNotifier {
   List<Quest> quests = [];
   List<AchievementBadge> badges = [];
   List<LedgerEntry> ledger = [];
-  double unallocated = 750;
+  int unallocatedSatang = 0;
   bool loaded = false;
+  String? loadErrorMessage;
 
   // ---------- persistence ----------
   Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw != null) {
-      try {
-        _fromJson(jsonDecode(raw));
-      } catch (_) {
+    SharedPreferences? prefs;
+    String? raw;
+    loadErrorMessage = null;
+
+    try {
+      prefs = await SharedPreferences.getInstance();
+      raw = prefs.getString(appStateStorageKey);
+      if (raw == null) {
         _initEmpty();
+      } else {
+        final decoded = jsonDecode(raw);
+        final rawState = _jsonObject(decoded);
+        final fromVersion = readSchemaVersion(rawState);
+        final migrated = migrateState(rawState, fromVersion);
+        _fromJson(migrated);
+
+        final needsRewrite = !rawState.containsKey('schemaVersion') ||
+            fromVersion != currentSchemaVersion;
+        if (needsRewrite) {
+          try {
+            await prefs.setString(appStateStorageKey, jsonEncode(toJson()));
+          } catch (_) {
+            loadErrorMessage =
+                'โหลดข้อมูลสำเร็จ แต่ยังอัปเดตรูปแบบจัดเก็บไม่ได้ กรุณาลองเปิดแอปใหม่';
+          }
+        }
       }
-    } else {
-      _initEmpty();
+    } on UnsupportedSchemaVersionException {
+      await _recoverFromLoadFailure(prefs, raw, newerVersion: true);
+    } catch (_) {
+      await _recoverFromLoadFailure(prefs, raw, newerVersion: false);
     }
+
     loaded = true;
+    notifyListeners();
+  }
+
+  Future<void> _recoverFromLoadFailure(
+    SharedPreferences? prefs,
+    String? raw, {
+    required bool newerVersion,
+  }) async {
+    var backupSaved = false;
+    if (prefs != null && raw != null) {
+      try {
+        backupSaved = await prefs.setString(appStateCorruptBackupKey, raw);
+      } catch (_) {
+        backupSaved = false;
+      }
+    }
+
+    _initEmpty();
+    final backupText = backupSaved
+        ? 'ระบบเก็บสำเนาข้อมูลเดิมไว้แล้ว'
+        : 'ระบบไม่สามารถเก็บสำเนาข้อมูลเดิมได้';
+    loadErrorMessage = newerVersion
+        ? 'ข้อมูลในเครื่องสร้างด้วยแอปเวอร์ชันใหม่กว่า จึงยังโหลดไม่ได้ '
+            'กรุณาอัปเดตแอป $backupText'
+        : 'โหลดข้อมูลไม่สำเร็จ $backupText และเริ่มแอปด้วยข้อมูลว่าง';
+  }
+
+  void clearLoadErrorMessage() {
+    if (loadErrorMessage == null) return;
+    loadErrorMessage = null;
     notifyListeners();
   }
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageKey, jsonEncode(_toJson()));
+    await prefs.setString(appStateStorageKey, jsonEncode(toJson()));
   }
 
-  Map<String, dynamic> _toJson() => {
+  Future<void> restoreBackup(BackupPreview backup) async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentState = toJson();
+    final currentRaw = jsonEncode(currentState);
+    final backupSaved =
+        await prefs.setString(appStatePreImportBackupKey, currentRaw);
+    if (!backupSaved) {
+      throw StateError('สำรองข้อมูลปัจจุบันก่อนกู้คืนไม่สำเร็จ');
+    }
+
+    try {
+      _fromJson(backup.migratedState);
+      final restoredRaw = jsonEncode(toJson());
+      final restored = await prefs.setString(appStateStorageKey, restoredRaw);
+      if (!restored) throw StateError('เขียนข้อมูลที่กู้คืนไม่สำเร็จ');
+    } catch (_) {
+      _fromJson(currentState);
+      rethrow;
+    }
+
+    loaded = true;
+    notifyListeners();
+  }
+
+  Map<String, dynamic> toJson() => {
+        'schemaVersion': currentSchemaVersion,
         'user': user.toJson(),
         'goals': goals.map((g) => g.toJson()).toList(),
         'transactions': transactions.map((t) => t.toJson()).toList(),
         'quests': quests.map((q) => q.toJson()).toList(),
         'badges': badges.map((b) => b.toJson()).toList(),
         'ledger': ledger.map((e) => e.toJson()).toList(),
-        'unallocated': unallocated,
+        'unallocatedSatang': unallocatedSatang,
       };
 
   void _fromJson(Map<String, dynamic> j) {
-    user = AppUser.fromJson(j['user']);
-    goals = (j['goals'] as List).map((e) => Goal.fromJson(e)).toList();
-    transactions =
-        (j['transactions'] as List).map((e) => SavingTransaction.fromJson(e)).toList();
-    quests = ((j['quests'] as List?) ?? []).map((e) => Quest.fromJson(e)).toList();
-    badges = ((j['badges'] as List?) ?? []).map((e) => AchievementBadge.fromJson(e)).toList();
-    ledger = ((j['ledger'] as List?) ?? []).map((e) => LedgerEntry.fromJson(e)).toList();
+    user = AppUser.fromJson(_jsonObject(j['user']));
+    goals = _jsonList(j['goals'], Goal.fromJson);
+    transactions = _jsonList(j['transactions'], SavingTransaction.fromJson);
+    quests = _jsonList(j['quests'], Quest.fromJson);
+    badges = _jsonList(j['badges'], AchievementBadge.fromJson);
+    ledger = _jsonList(j['ledger'], LedgerEntry.fromJson);
     if (quests.isEmpty) quests = _defaultQuests();
     if (badges.isEmpty) badges = _defaultBadges();
-    unallocated = (j['unallocated'] as num).toDouble();
+    unallocatedSatang = j['unallocatedSatang'] as int? ?? 0;
   }
 
   // ---------- ledger (รายรับ-รายจ่าย) ----------
-  void addLedger(LedgerType type, double amount, String category, String note) {
+  void addLedger(
+    LedgerType type,
+    int amountSatang,
+    String category,
+    String note,
+  ) {
+    if (amountSatang <= 0 || amountSatang > maxMoneyInputSatang) return;
     ledger.insert(
       0,
       LedgerEntry(
         id: _uuid.v4(),
         type: type,
-        amount: amount,
+        amountSatang: amountSatang,
         category: category,
         note: note,
         date: DateTime.now(),
@@ -93,15 +196,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  double get monthIncome => _monthSum(LedgerType.income);
-  double get monthExpense => _monthSum(LedgerType.expense);
+  int get monthIncomeSatang => _monthSumSatang(LedgerType.income);
+  int get monthExpenseSatang => _monthSumSatang(LedgerType.expense);
 
-  double _monthSum(LedgerType t) {
+  int _monthSumSatang(LedgerType t) {
     final now = DateTime.now();
     return ledger
         .where((e) =>
             e.type == t && e.date.year == now.year && e.date.month == now.month)
-        .fold(0.0, (s, e) => s + e.amount);
+        .fold<int>(0, (sum, entry) => sum + entry.amountSatang);
   }
 
   // ---------- pocket / transfer / lock / shared ----------
@@ -113,7 +216,7 @@ class AppState extends ChangeNotifier {
     final g = Goal(
       id: 'p-${_uuid.v4()}',
       name: name,
-      targetAmount: 0,
+      targetSatang: 0,
       startDate: DateTime.now(),
       targetDate: DateTime.now().add(const Duration(days: 365)),
       emoji: emoji,
@@ -126,23 +229,30 @@ class AppState extends ChangeNotifier {
     return g;
   }
 
-  void withdrawFromGoal(String id, double amount, {bool toUnallocated = true}) {
+  void withdrawFromGoal(
+    String id,
+    int amountSatang, {
+    bool toUnallocated = true,
+  }) {
     final g = goals.firstWhere((x) => x.id == id);
     if (g.isLockedNow) return;
-    final take = amount > g.currentAmount ? g.currentAmount : amount;
-    if (take <= 0) return;
-    g.currentAmount -= take;
-    if (g.status == GoalStatus.completed && g.currentAmount < g.targetAmount) {
+    final takeSatang = amountSatang > g.currentSatang
+        ? g.currentSatang
+        : amountSatang;
+    if (takeSatang <= 0) return;
+    g.currentSatang -= takeSatang;
+    if (g.status == GoalStatus.completed &&
+        g.currentSatang < g.targetSatang) {
       g.status = GoalStatus.active;
       g.completedDate = null;
     }
-    if (toUnallocated) unallocated += take;
+    if (toUnallocated) unallocatedSatang += takeSatang;
     transactions.insert(
       0,
       SavingTransaction(
         id: _uuid.v4(),
         type: TxType.withdraw,
-        amount: take,
+        amountSatang: takeSatang,
         date: DateTime.now(),
         goalId: id,
         note: 'ถอนออก',
@@ -152,23 +262,35 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void transfer(String fromId, String toId, double amount) {
-    if (fromId == toId || amount <= 0) return;
+  void transfer(String fromId, String toId, int amountSatang) {
+    if (fromId == toId || amountSatang <= 0) return;
     final from = goals.firstWhere((x) => x.id == fromId);
     final to = goals.firstWhere((x) => x.id == toId);
     if (from.isLockedNow) return;
-    var move = amount > from.currentAmount ? from.currentAmount : amount;
-    final space = to.flexible ? move : to.remaining;
-    move = move > space ? space : move;
-    if (move <= 0) return;
-    from.currentAmount -= move;
-    to.currentAmount += move;
-    if (to.targetAmount > 0 && to.currentAmount >= to.targetAmount) {
+    var moveSatang = amountSatang > from.currentSatang
+        ? from.currentSatang
+        : amountSatang;
+    final spaceSatang = to.flexible ? moveSatang : to.remainingSatang;
+    moveSatang = moveSatang > spaceSatang ? spaceSatang : moveSatang;
+    if (moveSatang <= 0) return;
+    from.currentSatang -= moveSatang;
+    to.currentSatang += moveSatang;
+    if (to.targetSatang > 0 && to.currentSatang >= to.targetSatang) {
       to.status = GoalStatus.completed;
       to.completedDate = DateTime.now();
     }
     final now = DateTime.now();
-    transactions.insert(0, SavingTransaction(id: _uuid.v4(), type: TxType.transfer, amount: move, date: now, goalId: fromId, note: 'โอนไป ${to.name}'));
+    transactions.insert(
+      0,
+      SavingTransaction(
+        id: _uuid.v4(),
+        type: TxType.transfer,
+        amountSatang: moveSatang,
+        date: now,
+        goalId: fromId,
+        note: 'โอนไป ${to.name}',
+      ),
+    );
     _save();
     notifyListeners();
   }
@@ -190,8 +312,10 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------- derived ----------
-  double get totalSaved => goals.fold(0.0, (s, g) => s + g.currentAmount);
-  double get grandTarget => goals.fold(0.0, (s, g) => s + g.targetAmount);
+  int get totalSavedSatang =>
+      goals.fold<int>(0, (sum, goal) => sum + goal.currentSatang);
+  int get grandTargetSatang =>
+      goals.fold<int>(0, (sum, goal) => sum + goal.targetSatang);
   List<Goal> get activeGoals =>
       goals.where((g) => g.status == GoalStatus.active).toList();
   List<Goal> get completedGoals =>
@@ -200,7 +324,7 @@ class AppState extends ChangeNotifier {
   // ---------- actions ----------
   Goal addGoal({
     required String name,
-    required double target,
+    required int targetSatang,
     required DateTime targetDate,
     String emoji = '🎯',
     GoalCategory category = GoalCategory.other,
@@ -209,7 +333,7 @@ class AppState extends ChangeNotifier {
     final g = Goal(
       id: 'g-${_uuid.v4()}',
       name: name,
-      targetAmount: target,
+      targetSatang: targetSatang,
       startDate: DateTime.now(),
       targetDate: targetDate,
       emoji: emoji,
@@ -223,7 +347,7 @@ class AppState extends ChangeNotifier {
   }
 
   void updateGoal(Goal g) {
-    if (g.currentAmount >= g.targetAmount) {
+    if (g.currentSatang >= g.targetSatang) {
       g.status = GoalStatus.completed;
       g.completedDate ??= DateTime.now();
     }
@@ -239,24 +363,26 @@ class AppState extends ChangeNotifier {
 
   /// เพิ่มเงินออม เข้ากระปุกเดียว หรือ (goalId == null) เข้ายังไม่จัดสรร
   SavingResult addSaving({
-    required double amount,
+    required int amountSatang,
     String? goalId,
     String note = '',
     DateTime? date,
     TxType source = TxType.deposit,
   }) {
+    if (amountSatang <= 0) return SavingResult(0, null, 0);
     final now = date ?? DateTime.now();
     int exp = 0;
-    double overflow = 0;
+    int overflowSatang = 0;
     Goal? completed;
 
     if (goalId != null) {
       final g = goals.firstWhere((x) => x.id == goalId);
-      final space = g.remaining;
-      final put = amount < space ? amount : space;
-      overflow = amount - put;
+      final spaceSatang = g.remainingSatang;
+      final putSatang =
+          amountSatang < spaceSatang ? amountSatang : spaceSatang;
+      overflowSatang = amountSatang - putSatang;
       final before = g.progress;
-      g.currentAmount += put;
+      g.currentSatang += putSatang;
       final after = g.progress;
       final milestones = {0.25: 20, 0.5: 30, 0.75: 40, 1.0: 100};
       milestones.forEach((m, e) {
@@ -273,7 +399,7 @@ class AppState extends ChangeNotifier {
         SavingTransaction(
           id: _uuid.v4(),
           type: source,
-          amount: put,
+          amountSatang: putSatang,
           date: now,
           goalId: goalId,
           note: note,
@@ -281,17 +407,17 @@ class AppState extends ChangeNotifier {
         ),
       );
     } else {
-      overflow = amount;
+      overflowSatang = amountSatang;
     }
 
-    if (overflow > 0) {
-      unallocated += overflow;
+    if (overflowSatang > 0) {
+      unallocatedSatang += overflowSatang;
       transactions.insert(
         0,
         SavingTransaction(
           id: _uuid.v4(),
           type: TxType.unallocated,
-          amount: overflow,
+          amountSatang: overflowSatang,
           date: now,
           note: goalId != null ? 'ส่วนเกินจากกระปุกที่เต็ม' : note,
         ),
@@ -309,14 +435,19 @@ class AppState extends ChangeNotifier {
     _recomputeBadges();
     _save();
     notifyListeners();
-    return SavingResult(exp, completed, overflow);
+    return SavingResult(exp, completed, overflowSatang);
   }
 
-  void allocateUnallocated(double amount, String goalId) {
-    if (amount <= 0) return;
-    if (amount > unallocated) amount = unallocated;
-    unallocated -= amount;
-    addSaving(amount: amount, goalId: goalId); // overflow กลับเข้า pool เอง
+  void allocateUnallocated(int amountSatang, String goalId) {
+    if (amountSatang <= 0) return;
+    if (amountSatang > unallocatedSatang) {
+      amountSatang = unallocatedSatang;
+    }
+    unallocatedSatang -= amountSatang;
+    addSaving(
+      amountSatang: amountSatang,
+      goalId: goalId,
+    ); // overflow กลับเข้า pool เอง
   }
 
   int claimQuest(String id) {
@@ -348,7 +479,7 @@ class AppState extends ChangeNotifier {
     required String name,
     required SaverMode mode,
     required String goalName,
-    required double target,
+    required int targetSatang,
     required DateTime targetDate,
     String emoji = '🎯',
   }) {
@@ -359,10 +490,15 @@ class AppState extends ChangeNotifier {
     goals = [];
     transactions = [];
     ledger = [];
-    unallocated = 0;
+    unallocatedSatang = 0;
     quests = _defaultQuests();
     badges = _defaultBadges();
-    addGoal(name: goalName, target: target, targetDate: targetDate, emoji: emoji);
+    addGoal(
+      name: goalName,
+      targetSatang: targetSatang,
+      targetDate: targetDate,
+      emoji: emoji,
+    );
   }
 
   void _recomputeBadges() {
@@ -386,7 +522,7 @@ class AppState extends ChangeNotifier {
   }
 
   int get level => levelFromExp(user.exp);
-  double get dailyCap => dailyDepositCap(user.mode.name, level);
+  int get dailyCapSatang => dailyDepositCapSatang(user.mode.name, level);
 
   // ล้างข้อมูลทั้งหมด → เริ่มใหม่ (ผ่าน onboarding)
   void resetDemo() {
@@ -401,7 +537,7 @@ class AppState extends ChangeNotifier {
     goals = [];
     transactions = [];
     ledger = [];
-    unallocated = 0;
+    unallocatedSatang = 0;
     quests = _defaultQuests();
     badges = _defaultBadges();
     _recomputeBadges();

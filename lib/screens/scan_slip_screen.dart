@@ -55,7 +55,10 @@ class _ScanSlipScreenState extends State<ScanSlipScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final amount = double.tryParse(_amount.text.replaceAll(',', '')) ?? 0;
+    final amountSatang = parseMoneyToSatang(_amount.text);
+    final inputError = _amount.text.trim().isEmpty
+        ? null
+        : moneyInputError(_amount.text);
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -118,6 +121,7 @@ class _ScanSlipScreenState extends State<ScanSlipScreen> {
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               prefixText: '฿ ',
+              errorText: inputError,
               filled: true,
               fillColor: AppColors.white,
               border: OutlineInputBorder(
@@ -164,18 +168,19 @@ class _ScanSlipScreenState extends State<ScanSlipScreen> {
           ),
           const SizedBox(height: 8),
           FilledButton(
-            onPressed: (!_confirmed || amount <= 0)
+            onPressed:
+                (!_confirmed || amountSatang == null || amountSatang <= 0)
                 ? null
                 : () {
                     final res = app.addSaving(
-                      amount: amount,
+                      amountSatang: amountSatang,
                       goalId: _dest == 'unallocated' ? null : _dest,
                       note: 'จากสลิป $_bank',
                       source: TxType.slip,
                     );
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text(
-                            'บันทึกจากสลิป ${formatMoney(amount)}${res.exp > 0 ? ' · +${res.exp} EXP' : ''}'),
+                            'บันทึกจากสลิป ${formatMoney(amountSatang)}${res.exp > 0 ? ' · +${res.exp} EXP' : ''}'),
                         backgroundColor: AppColors.deepGreen));
                     Navigator.pop(context);
                   },
