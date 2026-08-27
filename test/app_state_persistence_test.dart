@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:keepkapook/main.dart';
+import 'package:keepkapook/models/models.dart';
 import 'package:keepkapook/state/app_state.dart';
 import 'package:keepkapook/state/migrations.dart';
 import 'package:provider/provider.dart';
@@ -22,7 +23,7 @@ void main() {
     expect(AppState().toJson()['schemaVersion'], currentSchemaVersion);
   });
 
-  test('ข้อมูล v1 ที่ไม่มี schemaVersion โหลดได้ ยอดตรง และถูกเขียนเป็น v2',
+  test('ข้อมูล v1 ที่ไม่มี schemaVersion โหลดได้ ยอดตรง และถูกเขียนเป็น v3',
       () async {
     final oldJson = jsonEncode(<String, dynamic>{
       'user': <String, dynamic>{'name': 'ผู้ใช้เดิม'},
@@ -68,6 +69,9 @@ void main() {
     expect(app.goals.single.currentSatang, 1235);
     expect(app.totalSavedSatang, 1235);
     expect(app.transactions.single.amountSatang, 11);
+    expect(app.transactions.single.flow, TransactionFlow.externalIn);
+    expect(app.transactions.single.goalId, isNull);
+    expect(app.transactions.single.destinationGoalId, 'goal-old');
     expect(app.ledger.single.amountSatang, 268);
     expect(app.unallocatedSatang, 101);
     expect(app.loadErrorMessage, isNull);

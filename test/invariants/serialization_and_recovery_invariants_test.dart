@@ -37,9 +37,10 @@ void main() {
     final transaction = SavingTransaction(
       id: 'tx',
       type: TxType.deposit,
+      flow: TransactionFlow.externalIn,
       amountSatang: 120000,
       date: invariantTime,
-      goalId: 'goal',
+      destinationGoalId: 'goal',
       note: 'ออม',
       expAwarded: 10,
       isPossibleDuplicate: true,

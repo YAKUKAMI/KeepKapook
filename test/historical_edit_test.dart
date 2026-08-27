@@ -79,7 +79,7 @@ void main() {
           type: TxType.deposit,
           amountSatang: 5000,
           date: at,
-          goalId: 'goal-1',
+          destinationGoalId: 'goal-1',
           note: 'เริ่มออม',
           expAwarded: 10,
         ),
@@ -105,5 +105,43 @@ void main() {
     await tester.pumpAndSettle();
     expect(app.transactions, isEmpty);
     expect(app.goals.single.currentSatang, 0);
+  });
+
+  testWidgets('รายการโอนเก่าที่ไม่มีปลายทางปิดการแก้ไขพร้อมอธิบายภาษาไทย',
+      (tester) async {
+    final app = AppState()
+      ..loaded = true
+      ..goals = <Goal>[
+        Goal(
+          id: 'source',
+          name: 'ต้นทาง',
+          targetSatang: 100000,
+          currentSatang: 5000,
+          startDate: at,
+          targetDate: at.add(const Duration(days: 90)),
+        ),
+      ]
+      ..transactions = <SavingTransaction>[
+        SavingTransaction(
+          id: 'legacy-transfer',
+          type: TxType.transfer,
+          amountSatang: 1000,
+          date: at,
+          goalId: 'source',
+          note: 'โอนไป กระปุกที่ถูกลบ',
+        ),
+      ];
+    await tester.pumpWidget(wrap(app, const HistoryScreen()));
+
+    await tester.tap(find.text('โอนระหว่างกระปุก'));
+    await tester.pump();
+
+    expect(
+      find.text(
+        'รายการโอนเก่านี้ไม่มีข้อมูลกระปุกปลายทาง จึงแก้ไขหรือลบไม่ได้',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('แก้ไขประวัติ'), findsNothing);
   });
 }

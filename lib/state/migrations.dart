@@ -1,6 +1,7 @@
+import '../models/models.dart';
 import '../utils/format.dart';
 
-const int currentSchemaVersion = 2;
+const int currentSchemaVersion = 3;
 
 typedef StateMigration = Map<String, dynamic> Function(
   Map<String, dynamic> state,
@@ -9,8 +10,7 @@ typedef StateMigration = Map<String, dynamic> Function(
 /// แต่ละ key คือ version ต้นทาง เช่น key 1 ต้อง migrate v1 → v2
 final Map<int, StateMigration> _migrationSteps = <int, StateMigration>{
   1: _migrateV1ToV2,
-  // เมื่อเพิ่ม v3:
-  // 2: _migrateV2ToV3,
+  2: _migrateV2ToV3,
 };
 
 Map<String, dynamic> _migrateV1ToV2(Map<String, dynamic> state) {
@@ -44,6 +44,84 @@ Map<String, dynamic> _migrateV1ToV2(Map<String, dynamic> state) {
   return migrated;
 }
 
+Map<String, dynamic> _migrateV2ToV3(Map<String, dynamic> state) {
+  final migrated = Map<String, dynamic>.from(state);
+  final goalIdsByName = <String, List<String>>{};
+  final rawGoals = state['goals'];
+  if (rawGoals != null && rawGoals is! List) {
+    throw const FormatException('goals ต้องเป็น JSON array');
+  }
+  for (final rawGoal in (rawGoals as List? ?? const <dynamic>[])) {
+    if (rawGoal is! Map) {
+      throw const FormatException('ข้อมูล goal ต้องเป็น JSON object');
+    }
+    final goal = Map<String, dynamic>.from(rawGoal);
+    final id = goal['id']?.toString();
+    final name = goal['name']?.toString();
+    if (id == null || name == null) continue;
+    goalIdsByName.putIfAbsent(name, () => <String>[]).add(id);
+  }
+
+  final rawTransactions = state['transactions'];
+  if (rawTransactions != null && rawTransactions is! List) {
+    throw const FormatException('transactions ต้องเป็น JSON array');
+  }
+  migrated['transactions'] =
+      (rawTransactions as List? ?? const <dynamic>[]).map((rawTransaction) {
+    if (rawTransaction is! Map) {
+      throw const FormatException('ข้อมูล transaction ต้องเป็น JSON object');
+    }
+    final transaction = Map<String, dynamic>.from(rawTransaction);
+    final type = _legacyTransactionType(transaction['type']);
+    transaction['flow'] = transactionFlowForType(type).name;
+
+    switch (type) {
+      case TxType.deposit:
+      case TxType.adjust:
+      case TxType.slip:
+        transaction['destinationGoalId'] = transaction['goalId'];
+        transaction['goalId'] = null;
+        break;
+      case TxType.transfer:
+        transaction['destinationGoalId'] = _recoverTransferDestination(
+          transaction,
+          goalIdsByName,
+        );
+        break;
+      case TxType.unallocated:
+      case TxType.withdraw:
+        transaction['destinationGoalId'] = null;
+        break;
+    }
+    return transaction;
+  }).toList();
+  return migrated;
+}
+
+TxType _legacyTransactionType(Object? value) {
+  final name = value?.toString();
+  for (final type in TxType.values) {
+    if (type.name == name) return type;
+  }
+  // fromJson เดิมถือ type ที่หาย/ไม่รู้จักเป็น deposit เช่นกัน
+  return TxType.deposit;
+}
+
+String? _recoverTransferDestination(
+  Map<String, dynamic> transaction,
+  Map<String, List<String>> goalIdsByName,
+) {
+  const prefix = 'โอนไป ';
+  final note = transaction['note']?.toString() ?? '';
+  if (!note.startsWith(prefix)) return null;
+  final destinationName = note.substring(prefix.length);
+  final sourceGoalId = transaction['goalId']?.toString();
+  final matches = (goalIdsByName[destinationName] ?? const <String>[])
+      .where((id) => id != sourceGoalId)
+      .toList();
+  return matches.length == 1 ? matches.single : null;
+}
+
 List<dynamic> _migrateMoneyList(
   Object? value,
   Map<String, String> renamedFields,
@@ -52,7 +130,9 @@ List<dynamic> _migrateMoneyList(
   if (value is! List) throw const FormatException('ข้อมูลต้องเป็น JSON array');
 
   return value.map((entry) {
-    if (entry is! Map) throw const FormatException('ข้อมูลต้องเป็น JSON object');
+    if (entry is! Map) {
+      throw const FormatException('ข้อมูลต้องเป็น JSON object');
+    }
     final migrated = Map<String, dynamic>.from(entry);
     for (final rename in renamedFields.entries) {
       if (migrated.containsKey(rename.value)) {

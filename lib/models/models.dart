@@ -46,6 +46,23 @@ enum SaverMode { child, adult }
 
 enum TxType { deposit, unallocated, withdraw, transfer, adjust, slip }
 
+enum TransactionFlow { externalIn, externalOut, internal, adjustment }
+
+TransactionFlow transactionFlowForType(TxType type) {
+  switch (type) {
+    case TxType.deposit:
+    case TxType.unallocated:
+    case TxType.slip:
+      return TransactionFlow.externalIn;
+    case TxType.withdraw:
+      return TransactionFlow.externalOut;
+    case TxType.transfer:
+      return TransactionFlow.internal;
+    case TxType.adjust:
+      return TransactionFlow.adjustment;
+  }
+}
+
 // รายรับ-รายจ่าย (แยกจากการออม)
 enum LedgerType { income, expense }
 
@@ -208,9 +225,11 @@ class Goal {
 class SavingTransaction {
   String id;
   TxType type;
+  TransactionFlow flow;
   int amountSatang;
   DateTime date;
   String? goalId;
+  String? destinationGoalId;
   String note;
   int expAwarded;
   bool isPossibleDuplicate;
@@ -218,36 +237,48 @@ class SavingTransaction {
   SavingTransaction({
     required this.id,
     required this.type,
+    TransactionFlow? flow,
     required this.amountSatang,
     required this.date,
     this.goalId,
+    this.destinationGoalId,
     this.note = '',
     this.expAwarded = 0,
     this.isPossibleDuplicate = false,
-  });
+  }) : flow = flow ?? transactionFlowForType(type);
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'type': type.name,
+        'flow': flow.name,
         'amountSatang': amountSatang,
         'date': date.toIso8601String(),
         'goalId': goalId,
+        'destinationGoalId': destinationGoalId,
         'note': note,
         'expAwarded': expAwarded,
         'isPossibleDuplicate': isPossibleDuplicate,
       };
 
-  factory SavingTransaction.fromJson(Map<String, dynamic> j) =>
-      SavingTransaction(
-        id: _stringValue(j['id'], ''),
-        type: _enumValue(TxType.values, j['type'], TxType.deposit),
-        amountSatang: _intValue(j['amountSatang']),
-        date: _dateValue(j['date']),
-        goalId: j['goalId']?.toString(),
-        note: _stringValue(j['note'], ''),
-        expAwarded: _intValue(j['expAwarded']),
-        isPossibleDuplicate: _boolValue(j['isPossibleDuplicate'], false),
-      );
+  factory SavingTransaction.fromJson(Map<String, dynamic> j) {
+    final type = _enumValue(TxType.values, j['type'], TxType.deposit);
+    return SavingTransaction(
+      id: _stringValue(j['id'], ''),
+      type: type,
+      flow: _enumValue(
+        TransactionFlow.values,
+        j['flow'],
+        transactionFlowForType(type),
+      ),
+      amountSatang: _intValue(j['amountSatang']),
+      date: _dateValue(j['date']),
+      goalId: j['goalId']?.toString(),
+      destinationGoalId: j['destinationGoalId']?.toString(),
+      note: _stringValue(j['note'], ''),
+      expAwarded: _intValue(j['expAwarded']),
+      isPossibleDuplicate: _boolValue(j['isPossibleDuplicate'], false),
+    );
+  }
 }
 
 class Quest {

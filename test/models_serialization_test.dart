@@ -47,9 +47,10 @@ void main() {
       final model = SavingTransaction(
         id: 'tx-1',
         type: TxType.slip,
+        flow: TransactionFlow.externalIn,
         amountSatang: 25075,
         date: at,
-        goalId: 'goal-1',
+        destinationGoalId: 'goal-1',
         note: 'จากสลิป',
         expAwarded: 30,
         isPossibleDuplicate: true,
@@ -117,6 +118,10 @@ void main() {
 
     expect(Goal.fromJson({}).targetSatang, 0);
     expect(SavingTransaction.fromJson({}).amountSatang, 0);
+    expect(
+      SavingTransaction.fromJson({}).flow,
+      TransactionFlow.externalIn,
+    );
     expect(Quest.fromJson({}).target, 1);
     expect(AppUser.fromJson({}).onboarded, isTrue);
   });

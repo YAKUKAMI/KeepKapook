@@ -85,7 +85,7 @@ void main() {
       type: TxType.deposit,
       amountSatang: 500,
       date: invariantTime,
-      goalId: 'destination',
+      destinationGoalId: 'destination',
     );
     final internalTransfer = SavingTransaction(
       id: 'transfer',
@@ -93,7 +93,7 @@ void main() {
       amountSatang: 2000,
       date: invariantTime,
       goalId: 'source',
-      note: 'โอนไป destination',
+      destinationGoalId: 'destination',
     );
 
     final beforeTransfer = summarizeSevenDaySavings(

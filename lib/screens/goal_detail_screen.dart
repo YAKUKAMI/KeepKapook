@@ -25,7 +25,13 @@ class GoalDetailScreen extends StatelessWidget {
     }
     final color = Color(goal.themeColor);
     final goalMoney = summarizeGoalMoney(goal);
-    final txs = app.transactions.where((t) => t.goalId == goalId).toList();
+    final txs = app.transactions
+        .where(
+          (transaction) =>
+              transaction.goalId == goalId ||
+              transaction.destinationGoalId == goalId,
+        )
+        .toList();
 
     // ความเร็วออมเฉลี่ย + สถานะแผน (สำหรับ Recovery)
     final avgPerDaySatang = averageDepositPerDaySatang(txs, goal.startDate);

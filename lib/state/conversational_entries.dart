@@ -209,6 +209,12 @@ extension ConversationalEntryActions on AppState {
     SavingTransaction transaction,
     int deltaSatang,
   ) {
+    if (transaction.type == TxType.transfer &&
+        transaction.destinationGoalId == null) {
+      return const HistoryMutationResult.failure(
+        'รายการโอนเก่านี้ไม่มีข้อมูลกระปุกปลายทาง จึงแก้ไขหรือลบไม่ได้',
+      );
+    }
     if (deltaSatang == 0) return const HistoryMutationResult.success();
 
     Goal? sourceGoal;
@@ -217,21 +223,27 @@ extension ConversationalEntryActions on AppState {
         if (goal.id == transaction.goalId) sourceGoal = goal;
       }
     }
+    Goal? destinationGoal;
+    if (transaction.destinationGoalId != null) {
+      for (final goal in goals) {
+        if (goal.id == transaction.destinationGoalId) destinationGoal = goal;
+      }
+    }
 
     switch (transaction.type) {
       case TxType.deposit:
       case TxType.adjust:
       case TxType.slip:
-        if (sourceGoal == null ||
+        if (destinationGoal == null ||
             !_canSetGoalBalance(
-              sourceGoal,
-              sourceGoal.currentSatang + deltaSatang,
+              destinationGoal,
+              destinationGoal.currentSatang + deltaSatang,
             )) {
           return const HistoryMutationResult.failure(
             'แก้ยอดนี้ไม่ได้ เพราะยอดกระปุกปัจจุบันไม่พอหรือจะเกินเป้าหมาย',
           );
         }
-        sourceGoal.currentSatang += deltaSatang;
+        destinationGoal.currentSatang += deltaSatang;
         break;
       case TxType.unallocated:
         if (unallocatedSatang + deltaSatang < 0) {
@@ -256,7 +268,6 @@ extension ConversationalEntryActions on AppState {
         unallocatedSatang += deltaSatang;
         break;
       case TxType.transfer:
-        final destinationGoal = _transferDestination(transaction);
         if (sourceGoal == null ||
             destinationGoal == null ||
             !_canSetGoalBalance(
@@ -282,19 +293,6 @@ extension ConversationalEntryActions on AppState {
     if (valueSatang < 0) return false;
     if (goal.flexible || goal.targetSatang <= 0) return true;
     return valueSatang <= goal.targetSatang;
-  }
-
-  Goal? _transferDestination(SavingTransaction transaction) {
-    const prefix = 'โอนไป ';
-    if (!transaction.note.startsWith(prefix)) return null;
-    final destinationName = transaction.note.substring(prefix.length).trim();
-    final matches = goals
-        .where(
-          (goal) =>
-              goal.id != transaction.goalId && goal.name == destinationName,
-        )
-        .toList();
-    return matches.length == 1 ? matches.single : null;
   }
 
   void _refreshGoalStatuses(DateTime at) {

@@ -330,10 +330,12 @@ class AppState extends ChangeNotifier {
       SavingTransaction(
         id: _uuid.v4(),
         type: TxType.withdraw,
+        flow: toUnallocated
+            ? TransactionFlow.internal
+            : TransactionFlow.externalOut,
         amountSatang: takeSatang,
         date: DateTime.now(),
         goalId: id,
-        note: 'ถอนออก',
       ),
     );
     _save();
@@ -373,10 +375,11 @@ class AppState extends ChangeNotifier {
       SavingTransaction(
         id: _uuid.v4(),
         type: TxType.transfer,
+        flow: TransactionFlow.internal,
         amountSatang: moveSatang,
         date: now,
         goalId: fromId,
-        note: 'โอนไป ${to.name}',
+        destinationGoalId: toId,
       ),
     );
     _save();
@@ -484,9 +487,11 @@ class AppState extends ChangeNotifier {
     String note = '',
     DateTime? date,
     TxType source = TxType.deposit,
+    TransactionFlow? flow,
     required bool persist,
   }) {
     final now = (date ?? DateTime.now()).toUtc();
+    final transactionFlow = flow ?? transactionFlowForType(source);
     int exp = 0;
     int overflowSatang = 0;
     Goal? completed;
@@ -519,9 +524,10 @@ class AppState extends ChangeNotifier {
         SavingTransaction(
           id: _uuid.v4(),
           type: source,
+          flow: transactionFlow,
           amountSatang: putSatang,
           date: now,
-          goalId: goal.id,
+          destinationGoalId: goal.id,
           note: note,
           expAwarded: exp,
         ),
@@ -537,9 +543,10 @@ class AppState extends ChangeNotifier {
         SavingTransaction(
           id: _uuid.v4(),
           type: TxType.unallocated,
+          flow: transactionFlow,
           amountSatang: overflowSatang,
           date: now,
-          note: goal != null ? 'ส่วนเกินจากกระปุกที่เต็ม' : note,
+          note: note,
         ),
       );
     }
@@ -571,6 +578,7 @@ class AppState extends ChangeNotifier {
     _addSaving(
       amountSatang: allocatedSatang,
       goal: goal,
+      flow: TransactionFlow.internal,
       persist: true,
     ); // overflow กลับเข้า pool เอง
   }

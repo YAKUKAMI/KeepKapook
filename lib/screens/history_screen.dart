@@ -38,6 +38,10 @@ class HistoryScreen extends StatelessWidget {
       return null;
     }
 
+    bool hasUnknownTransferDestination(SavingTransaction transaction) =>
+        transaction.type == TxType.transfer &&
+        transaction.destinationGoalId == null;
+
     return Scaffold(
       backgroundColor: AppColors.cream,
       body: SafeArea(
@@ -90,55 +94,88 @@ class HistoryScreen extends StatelessWidget {
                 'ยังไม่มีรายการ',
                 style: TextStyle(color: AppColors.mutedText),
               ),
-            ...txs.map((t) => ListTile(
-                  onTap: () => _editTransaction(context, app, t),
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.mint.withValues(alpha: 0.15),
-                    child: Icon(
-                      t.type == TxType.withdraw
-                          ? Icons.arrow_downward
-                          : Icons.arrow_upward,
-                      color: AppColors.mint,
-                      size: 18,
+            ...txs.map((t) {
+              final sourceName = goalName(t.goalId);
+              final destinationName = goalName(t.destinationGoalId);
+              final unknownDestination = hasUnknownTransferDestination(t);
+              return ListTile(
+                onTap: unknownDestination
+                    ? () => _showUnknownDestinationMessage(context)
+                    : () => _editTransaction(context, app, t),
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.mint.withValues(alpha: 0.15),
+                  child: Icon(
+                    t.type == TxType.withdraw
+                        ? Icons.arrow_downward
+                        : Icons.arrow_upward,
+                    color: AppColors.mint,
+                    size: 18,
+                  ),
+                ),
+                title: Text(_txLabel(t.type),
+                    style: const TextStyle(fontSize: 14)),
+                subtitle: Text(
+                  '${formatThaiDate(t.date.toLocal(), short: true)}'
+                  '${sourceName != null ? ' · จาก $sourceName' : ''}'
+                  '${destinationName != null ? ' · ไป $destinationName' : ''}'
+                  '${t.note.isNotEmpty ? ' · ${t.note}' : ''}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${t.type == TxType.withdraw ? '-' : '+'}${formatMoney(t.amountSatang)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.deepGreen),
                     ),
-                  ),
-                  title: Text(_txLabel(t.type),
-                      style: const TextStyle(fontSize: 14)),
-                  subtitle: Text(
-                    '${formatThaiDate(t.date.toLocal(), short: true)}'
-                    '${goalName(t.goalId) != null ? ' · ${goalName(t.goalId)}' : ''}'
-                    '${t.note.isNotEmpty ? ' · ${t.note}' : ''}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${t.type == TxType.withdraw ? '-' : '+'}${formatMoney(t.amountSatang)}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.deepGreen),
-                      ),
-                      PopupMenuButton<String>(
-                        key: ValueKey('history-actions-${t.id}'),
-                        tooltip: 'จัดการรายการ',
-                        onSelected: (action) {
-                          if (action == 'edit') {
-                            _editTransaction(context, app, t);
-                          } else {
-                            _confirmDelete(context, app, t);
-                          }
-                        },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'edit', child: Text('แก้ไข')),
-                          PopupMenuItem(value: 'delete', child: Text('ลบ')),
-                        ],
-                      ),
-                    ],
-                  ),
-                )),
+                    PopupMenuButton<String>(
+                      key: ValueKey('history-actions-${t.id}'),
+                      tooltip: 'จัดการรายการ',
+                      onSelected: (action) {
+                        if (action == 'edit') {
+                          _editTransaction(context, app, t);
+                        } else {
+                          _confirmDelete(context, app, t);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'edit',
+                          enabled: !unknownDestination,
+                          child: const Text('แก้ไข'),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          enabled: !unknownDestination,
+                          child: const Text('ลบ'),
+                        ),
+                        if (unknownDestination)
+                          const PopupMenuItem<String>(
+                            enabled: false,
+                            child: Text(
+                              'ไม่พบข้อมูลกระปุกปลายทางของรายการโอนเก่า',
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showUnknownDestinationMessage(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'รายการโอนเก่านี้ไม่มีข้อมูลกระปุกปลายทาง จึงแก้ไขหรือลบไม่ได้',
         ),
       ),
     );

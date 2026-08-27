@@ -39,7 +39,7 @@ void main() {
           type: TxType.deposit,
           amountSatang: 25000,
           date: invariantTime,
-          goalId: goal.id,
+          destinationGoalId: goal.id,
         ),
       ];
 

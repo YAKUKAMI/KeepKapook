@@ -44,7 +44,7 @@ lib/
 │                            AchievementBadge, AppUser + enums
 ├─ state/app_state.dart      AppState (ChangeNotifier): action หลัก + persist + _initEmpty()
 ├─ state/conversational_entries.dart  part: save/undo + แก้ไข/ลบประวัติ
-├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2)
+├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3)
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
@@ -67,6 +67,7 @@ test/
 ├─ backup_test.dart
 ├─ app_state_money_test.dart
 ├─ financial_summary_test.dart  parity ของ goal/month/7-day pure summaries
+├─ transaction_flow_test.dart   flow + source/destination + legacy edit guard
 ├─ parser_test.dart          corpus accuracy + parser edge cases
 ├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
 ├─ historical_edit_test.dart       edit/delete history + ledger
@@ -87,13 +88,13 @@ test/
 - SharedPreferences key: `keepkapook_state_v1`
 - Corrupt backup key: `keepkapook_state_v1_corrupt_backup`
 - Pre-import backup key: `keepkapook_state_v1_pre_import_backup` — เก็บ state ปัจจุบันก่อนกู้คืนทับทุกครั้ง
-- รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 2` และ migration framework ที่ `lib/state/migrations.dart`
+- รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 3` และ migration framework ที่ `lib/state/migrations.dart`
 
 ตัวอย่างย่อของ JSON ที่ persist จริงในปัจจุบัน:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "user": {"name": "...", "emoji": "🐷", "exp": 0,
     "consistencyWeeks": 0, "mode": "adult", "onboarded": true},
   "goals": [{
@@ -104,8 +105,10 @@ test/
     "themeColor": 4283615141, "status": "active", "completedDate": null,
     "flexible": false, "locked": false, "lockUntil": null, "shared": false, "members": []
   }],
-  "transactions": [{"id": "...", "type": "deposit", "amountSatang": 50000,
-    "date": "2026-08-24T00:00:00.000", "goalId": "g-...", "note": "", "expAwarded": 10, "isPossibleDuplicate": false}],
+  "transactions": [{"id": "...", "type": "deposit", "flow": "externalIn",
+    "amountSatang": 50000, "date": "2026-08-24T00:00:00.000",
+    "goalId": null, "destinationGoalId": "g-...", "note": "",
+    "expAwarded": 10, "isPossibleDuplicate": false}],
   "quests": [{"id": "q-deposit", "title": "...", "description": "...", "period": "daily", "target": 1, "progress": 0, "expReward": 15, "claimed": false}],
   "badges": [{"id": "b-first-drop", "name": "...", "description": "...", "emoji": "💧", "condition": "...", "unlocked": false, "progress": 0.0}],
   "ledger": [{"id": "...", "type": "income", "amountSatang": 100000, "category": "อื่น ๆ", "note": "", "date": "2026-08-24T00:00:00.000"}],
@@ -114,11 +117,15 @@ test/
 ```
 
 - สถานะการโหลดปัจจุบัน: ข้อมูลไม่มี `schemaVersion` ถือเป็น v1 แล้วเขียนกลับพร้อม version; ถ้า parse ไม่ผ่านหรือ version ใหม่กว่าแอป จะสำรอง raw JSON และแสดง `MaterialBanner` ภาษาไทยก่อนใช้ state ว่าง
-- ชื่อ key ลงท้าย `_v1` เป็นชื่อ storage key เดิมเพื่อรักษาความเข้ากันได้ ไม่ใช่เลข schema ปัจจุบัน; schema ใน JSON คือ v2
+- ชื่อ key ลงท้าย `_v1` เป็นชื่อ storage key เดิมเพื่อรักษาความเข้ากันได้ ไม่ใช่เลข schema ปัจจุบัน; schema ใน JSON คือ v3
 - **ทุกครั้งที่เพิ่ม/เปลี่ยน/ลบ field ใน model ต้องเพิ่ม `schemaVersion` และเขียน migration**
   ค่า version ปัจจุบันและ migration steps อยู่ใน `lib/state/migrations.dart`
 - `fromJson` ทุกตัวต้องทนข้อมูลเก่า: field ที่เพิ่มใหม่ต้องมี default ไม่ใช่ `!`
 - โหลดตอนเปิดแอปต้องอยู่ใน try/catch — parse ไม่ผ่านห้าม crash ให้ fallback + แจ้งผู้ใช้ ไม่ใช่ล้างข้อมูลเงียบๆ
+- `SavingTransaction.flow` แยกทิศทางเงินออกจาก `TxType`: `externalIn`, `externalOut`, `internal`, `adjustment`; `goalId` คือ source และ `destinationGoalId` คือ destination (nullable ทั้งคู่)
+- migration v2→v3 ย้าย destination ของ deposit/slip/adjust ไป `destinationGoalId` และกู้ปลายทาง transfer จากชื่อใน note เฉพาะเมื่อ exact match ได้หนึ่ง goal เท่านั้น; ชื่อซ้ำ/หาไม่พบต้องคง null และห้าม parse note นอก migration
+- ข้อจำกัดของข้อมูล v2: allocate เคย persist เป็น `TxType.deposit` และ withdraw ไม่ได้ persist ค่า `toUnallocated`; migration จึง map flow ตาม `TxType` ที่เก็บไว้เท่านั้น (`deposit`→`externalIn`, `withdraw`→`externalOut`) และไม่เดาจากยอดหรือลำดับรายการ
+- `note` ของ transaction ใหม่เป็นข้อความที่ผู้ใช้กรอกเท่านั้น ห้ามซ่อน source/destination หรือข้อมูลโครงสร้างไว้ในข้อความ
 
 ### กฎเรื่องจำนวนเงิน
 
@@ -242,8 +249,8 @@ flutter build apk --release  # Android SDK ติดตั้งแล้ว; AP
 **เพิ่ม field ใน model**
 `models/models.dart` (ใส่ default ใน `fromJson`) → bump `schemaVersion` → เขียน migration → รันแอปด้วยข้อมูลเก่าดูว่าไม่พัง → unit test round-trip `toJson`/`fromJson`
 
-**เพิ่ม schema v3 (หรือ version ถัดไป)**
-เพิ่ม `currentSchemaVersion` ใน `state/migrations.dart` → เขียน `_migrateV2ToV3` → เพิ่ม `2: _migrateV2ToV3` ใน `_migrationSteps` (key คือ version ต้นทาง) → เขียน unit test migrate จาก v2 และทดสอบ migrate ต่อขั้นจาก v1 ถึง version ล่าสุด
+**เพิ่ม schema v4 (หรือ version ถัดไป)**
+เพิ่ม `currentSchemaVersion` ใน `state/migrations.dart` → เขียน `_migrateV3ToV4` → เพิ่ม `3: _migrateV3ToV4` ใน `_migrationSteps` (key คือ version ต้นทาง) → เขียน unit test migrate จาก v3 และทดสอบ migrate ต่อขั้นจาก v1 ถึง version ล่าสุด
 
 **เพิ่ม quest หรือ badge**
 เพิ่ม definition + เงื่อนไข unlock (เป็น pure function) → unit test เงื่อนไข → เช็กว่า celebration dialog ไม่เด้งซ้ำ
@@ -265,7 +272,7 @@ void someAction(...) {
 ## 10. Backlog
 
 ### P0 — ต้องเสร็จก่อนปล่อยผู้ใช้จริง
-- [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v2)
+- [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v3)
 - [x] เปลี่ยนยอดเงินเป็น `int` สตางค์ + migration v1→v2
 - [x] Export / Import ข้อมูลเป็นไฟล์ JSON พร้อม validate, migration, preview และ pre-import backup
 - [x] Disclaimer "ไม่ใช่แอปธนาคาร ไม่มีเงินจริง" ใน onboarding + Settings
@@ -290,7 +297,7 @@ void someAction(...) {
 - [ ] แก้กราฟ 7 วันที่นับทุก transaction ยกเว้น withdraw (รวม transfer/unallocated/adjust/slip)
 - [ ] ทำ progress logic ให้ quest `q-allocate`, `q-weekly-review`, `q-weekly-consistency` และ badge `b-rhythm`, `b-memory`
 - [ ] เพิ่ม category selector ใน NewGoal และกำหนดพฤติกรรมของ `GoalPriority` (ปัจจุบัน persist อย่างเดียว)
-- [ ] เพิ่มปลายทาง transfer แบบ id ใน `SavingTransaction`; ปัจจุบันเก็บต้นทางใน `goalId` และชื่อปลายทางใน `note`
+- [x] เพิ่ม `TransactionFlow` + `destinationGoalId` และ migration v2→v3; transaction ใหม่ไม่เก็บข้อมูลโครงสร้างใน `note`
 - [ ] รวม date/time calculation ไว้ helper กลางและทำ UTC/local boundary ให้สม่ำเสมอ
 
 ### P2
