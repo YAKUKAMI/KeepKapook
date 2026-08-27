@@ -4,8 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../utils/format.dart';
+import '../utils/parser/parser.dart';
 import 'backup.dart';
 import 'migrations.dart';
+
+part 'conversational_entries.dart';
 
 const appStateStorageKey = 'keepkapook_state_v1';
 const appStateCorruptBackupKey = '${appStateStorageKey}_corrupt_backup';
@@ -120,6 +123,11 @@ class AppState extends ChangeNotifier {
     await prefs.setString(appStateStorageKey, jsonEncode(toJson()));
   }
 
+  void _saveAndNotify() {
+    _save();
+    notifyListeners();
+  }
+
   Future<void> restoreBackup(BackupPreview backup) async {
     final prefs = await SharedPreferences.getInstance();
     final currentState = toJson();
@@ -183,7 +191,7 @@ class AppState extends ChangeNotifier {
         amountSatang: amountSatang,
         category: category,
         note: note,
-        date: DateTime.now(),
+        date: DateTime.now().toUtc(),
       ),
     );
     _save();
@@ -201,10 +209,12 @@ class AppState extends ChangeNotifier {
 
   int _monthSumSatang(LedgerType t) {
     final now = DateTime.now();
-    return ledger
-        .where((e) =>
-            e.type == t && e.date.year == now.year && e.date.month == now.month)
-        .fold<int>(0, (sum, entry) => sum + entry.amountSatang);
+    return ledger.where((e) {
+      final localDate = e.date.toLocal();
+      return e.type == t &&
+          localDate.year == now.year &&
+          localDate.month == now.month;
+    }).fold<int>(0, (sum, entry) => sum + entry.amountSatang);
   }
 
   // ---------- pocket / transfer / lock / shared ----------
@@ -236,13 +246,11 @@ class AppState extends ChangeNotifier {
   }) {
     final g = goals.firstWhere((x) => x.id == id);
     if (g.isLockedNow) return;
-    final takeSatang = amountSatang > g.currentSatang
-        ? g.currentSatang
-        : amountSatang;
+    final takeSatang =
+        amountSatang > g.currentSatang ? g.currentSatang : amountSatang;
     if (takeSatang <= 0) return;
     g.currentSatang -= takeSatang;
-    if (g.status == GoalStatus.completed &&
-        g.currentSatang < g.targetSatang) {
+    if (g.status == GoalStatus.completed && g.currentSatang < g.targetSatang) {
       g.status = GoalStatus.active;
       g.completedDate = null;
     }
@@ -267,9 +275,8 @@ class AppState extends ChangeNotifier {
     final from = goals.firstWhere((x) => x.id == fromId);
     final to = goals.firstWhere((x) => x.id == toId);
     if (from.isLockedNow) return;
-    var moveSatang = amountSatang > from.currentSatang
-        ? from.currentSatang
-        : amountSatang;
+    var moveSatang =
+        amountSatang > from.currentSatang ? from.currentSatang : amountSatang;
     final spaceSatang = to.flexible ? moveSatang : to.remainingSatang;
     moveSatang = moveSatang > spaceSatang ? spaceSatang : moveSatang;
     if (moveSatang <= 0) return;
@@ -368,9 +375,28 @@ class AppState extends ChangeNotifier {
     String note = '',
     DateTime? date,
     TxType source = TxType.deposit,
+  }) =>
+      _addSaving(
+        amountSatang: amountSatang,
+        goalId: goalId,
+        note: note,
+        date: date,
+        source: source,
+        persist: true,
+      );
+
+  SavingResult _addSaving({
+    required int amountSatang,
+    String? goalId,
+    String note = '',
+    DateTime? date,
+    TxType source = TxType.deposit,
+    required bool persist,
   }) {
-    if (amountSatang <= 0) return SavingResult(0, null, 0);
-    final now = date ?? DateTime.now();
+    if (amountSatang <= 0 || amountSatang > maxMoneyInputSatang) {
+      return SavingResult(0, null, 0);
+    }
+    final now = (date ?? DateTime.now()).toUtc();
     int exp = 0;
     int overflowSatang = 0;
     Goal? completed;
@@ -378,8 +404,7 @@ class AppState extends ChangeNotifier {
     if (goalId != null) {
       final g = goals.firstWhere((x) => x.id == goalId);
       final spaceSatang = g.remainingSatang;
-      final putSatang =
-          amountSatang < spaceSatang ? amountSatang : spaceSatang;
+      final putSatang = amountSatang < spaceSatang ? amountSatang : spaceSatang;
       overflowSatang = amountSatang - putSatang;
       final before = g.progress;
       g.currentSatang += putSatang;
@@ -433,8 +458,10 @@ class AppState extends ChangeNotifier {
 
     user.exp += exp;
     _recomputeBadges();
-    _save();
-    notifyListeners();
+    if (persist) {
+      _save();
+      notifyListeners();
+    }
     return SavingResult(exp, completed, overflowSatang);
   }
 
@@ -453,7 +480,12 @@ class AppState extends ChangeNotifier {
   int claimQuest(String id) {
     final q = quests.firstWhere((x) => x.id == id,
         orElse: () => Quest(
-            id: '', title: '', description: '', period: '', target: 1, expReward: 0));
+            id: '',
+            title: '',
+            description: '',
+            period: '',
+            target: 1,
+            expReward: 0));
     if (q.id.isEmpty || q.claimed || !q.complete) return 0;
     q.claimed = true;
     user.exp += q.expReward;
@@ -544,18 +576,72 @@ class AppState extends ChangeNotifier {
   }
 
   List<Quest> _defaultQuests() => [
-        Quest(id: 'q-deposit', title: 'บันทึกเงินออม', description: 'เพิ่มเงินเข้ากระปุกวันนี้', period: 'daily', target: 1, expReward: 15),
-        Quest(id: 'q-allocate', title: 'จัดสรรเงิน', description: 'จัดสรรเงินที่ยังไม่เลือกเป้าหมาย', period: 'daily', target: 1, expReward: 15),
-        Quest(id: 'q-weekly-review', title: 'ทบทวนเป้าหมาย', description: 'เปิดดูกระปุก 3 ครั้งสัปดาห์นี้', period: 'weekly', target: 3, expReward: 40),
-        Quest(id: 'q-weekly-consistency', title: 'รักษาความสม่ำเสมอ', description: 'ออมตามแผน 5 ครั้งสัปดาห์นี้', period: 'weekly', target: 5, expReward: 40),
+        Quest(
+            id: 'q-deposit',
+            title: 'บันทึกเงินออม',
+            description: 'เพิ่มเงินเข้ากระปุกวันนี้',
+            period: 'daily',
+            target: 1,
+            expReward: 15),
+        Quest(
+            id: 'q-allocate',
+            title: 'จัดสรรเงิน',
+            description: 'จัดสรรเงินที่ยังไม่เลือกเป้าหมาย',
+            period: 'daily',
+            target: 1,
+            expReward: 15),
+        Quest(
+            id: 'q-weekly-review',
+            title: 'ทบทวนเป้าหมาย',
+            description: 'เปิดดูกระปุก 3 ครั้งสัปดาห์นี้',
+            period: 'weekly',
+            target: 3,
+            expReward: 40),
+        Quest(
+            id: 'q-weekly-consistency',
+            title: 'รักษาความสม่ำเสมอ',
+            description: 'ออมตามแผน 5 ครั้งสัปดาห์นี้',
+            period: 'weekly',
+            target: 5,
+            expReward: 40),
       ];
 
   List<AchievementBadge> _defaultBadges() => [
-        AchievementBadge(id: 'b-first-drop', name: 'First Drop', description: 'ออมครั้งแรก', emoji: '💧', condition: 'บันทึกเงินออมครั้งแรก'),
-        AchievementBadge(id: 'b-rhythm', name: '7-Day Rhythm', description: 'ทำตามแผน 7 ครั้ง', emoji: '🎵', condition: 'ออมตามแผน 7 ครั้ง'),
-        AchievementBadge(id: 'b-halfway', name: 'Halfway Hero', description: 'กระปุกถึง 50%', emoji: '⛰️', condition: 'กระปุกใดถึง 50%'),
-        AchievementBadge(id: 'b-crusher', name: 'Goal Crusher', description: 'สำเร็จเป้าหมายแรก', emoji: '🏆', condition: 'ทำเป้าหมายสำเร็จ 1 อัน'),
-        AchievementBadge(id: 'b-triple', name: 'Triple Keeper', description: 'สำเร็จ 3 เป้าหมาย', emoji: '👑', condition: 'ทำเป้าหมายสำเร็จ 3 อัน'),
-        AchievementBadge(id: 'b-memory', name: 'Memory Maker', description: 'เพิ่มรูป 10 รูป', emoji: '📸', condition: 'เพิ่มรูปใน Album 10 รูป'),
+        AchievementBadge(
+            id: 'b-first-drop',
+            name: 'First Drop',
+            description: 'ออมครั้งแรก',
+            emoji: '💧',
+            condition: 'บันทึกเงินออมครั้งแรก'),
+        AchievementBadge(
+            id: 'b-rhythm',
+            name: '7-Day Rhythm',
+            description: 'ทำตามแผน 7 ครั้ง',
+            emoji: '🎵',
+            condition: 'ออมตามแผน 7 ครั้ง'),
+        AchievementBadge(
+            id: 'b-halfway',
+            name: 'Halfway Hero',
+            description: 'กระปุกถึง 50%',
+            emoji: '⛰️',
+            condition: 'กระปุกใดถึง 50%'),
+        AchievementBadge(
+            id: 'b-crusher',
+            name: 'Goal Crusher',
+            description: 'สำเร็จเป้าหมายแรก',
+            emoji: '🏆',
+            condition: 'ทำเป้าหมายสำเร็จ 1 อัน'),
+        AchievementBadge(
+            id: 'b-triple',
+            name: 'Triple Keeper',
+            description: 'สำเร็จ 3 เป้าหมาย',
+            emoji: '👑',
+            condition: 'ทำเป้าหมายสำเร็จ 3 อัน'),
+        AchievementBadge(
+            id: 'b-memory',
+            name: 'Memory Maker',
+            description: 'เพิ่มรูป 10 รูป',
+            emoji: '📸',
+            condition: 'เพิ่มรูปใน Album 10 รูป'),
       ];
 }

@@ -2,7 +2,8 @@ import 'package:intl/intl.dart';
 
 // ---------- Money ----------
 const int maxMoneyInputSatang = 10000000000; // ฿100,000,000
-const int _maxSafeMoneySatang = 9007199254740991; // JavaScript Number.MAX_SAFE_INTEGER
+const int _maxSafeMoneySatang =
+    9007199254740991; // JavaScript Number.MAX_SAFE_INTEGER
 
 final RegExp _moneyInputPattern =
     RegExp(r'^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$');
@@ -61,10 +62,29 @@ String formatMoney(int amountSatang) {
   return '฿${negative ? '-' : ''}$formattedBaht$decimal';
 }
 
+String formatMoneyInput(int amountSatang) {
+  final negative = amountSatang < 0;
+  final absolute = amountSatang.abs();
+  final baht = absolute ~/ 100;
+  final satang = absolute % 100;
+  final decimal = satang == 0 ? '' : '.${satang.toString().padLeft(2, '0')}';
+  return '${negative ? '-' : ''}$baht$decimal';
+}
+
 // ---------- Date (Thai, พ.ศ.) ----------
 const _thaiMonths = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+  'มกราคม',
+  'กุมภาพันธ์',
+  'มีนาคม',
+  'เมษายน',
+  'พฤษภาคม',
+  'มิถุนายน',
+  'กรกฎาคม',
+  'สิงหาคม',
+  'กันยายน',
+  'ตุลาคม',
+  'พฤศจิกายน',
+  'ธันวาคม',
 ];
 
 String formatThaiDate(DateTime d, {bool short = false}) {
@@ -120,12 +140,36 @@ LevelInfo levelProgress(int totalExp) {
 }
 
 // หมวดรายรับ-รายจ่าย (MAKE-style)
-const incomeCategories = ['เงินเดือน', 'ค่าขนม', 'งานพิเศษ', 'โบนัส', 'ของขวัญ', 'อื่น ๆ'];
-const expenseCategories = ['อาหาร', 'เดินทาง', 'ช้อปปิ้ง', 'บันเทิง', 'การเรียน', 'บิล', 'อื่น ๆ'];
+const incomeCategories = [
+  'เงินเดือน',
+  'ค่าขนม',
+  'งานพิเศษ',
+  'โบนัส',
+  'ของขวัญ',
+  'อื่น ๆ'
+];
+const expenseCategories = [
+  'อาหาร',
+  'เดินทาง',
+  'ช้อปปิ้ง',
+  'บันเทิง',
+  'การเรียน',
+  'บิล',
+  'อื่น ๆ'
+];
 
 const categoryEmoji = {
-  'เงินเดือน': '💼', 'ค่าขนม': '🪙', 'งานพิเศษ': '🧑‍💻', 'โบนัส': '🎁', 'ของขวัญ': '🎀',
-  'อาหาร': '🍜', 'เดินทาง': '🚌', 'ช้อปปิ้ง': '🛍️', 'บันเทิง': '🎬', 'การเรียน': '📚', 'บิล': '🧾',
+  'เงินเดือน': '💼',
+  'ค่าขนม': '🪙',
+  'งานพิเศษ': '🧑‍💻',
+  'โบนัส': '🎁',
+  'ของขวัญ': '🎀',
+  'อาหาร': '🍜',
+  'เดินทาง': '🚌',
+  'ช้อปปิ้ง': '🛍️',
+  'บันเทิง': '🎬',
+  'การเรียน': '📚',
+  'บิล': '🧾',
   'อื่น ๆ': '✨',
 };
 

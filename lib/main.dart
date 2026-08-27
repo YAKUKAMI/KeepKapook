@@ -4,11 +4,11 @@ import 'state/app_state.dart';
 import 'theme/app_theme.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/goals_screen.dart';
-import 'screens/add_saving_screen.dart';
 import 'screens/quests_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'widgets/conversational_entry_sheet.dart';
 
 void main() {
   runApp(
@@ -67,15 +67,15 @@ class _HomeShellState extends State<HomeShell> {
         body: SafeArea(child: pages[_index]),
         floatingActionButton: FloatingActionButton(
           backgroundColor: AppColors.coral,
-          onPressed: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const AddSavingScreen())),
-          child: const Icon(Icons.add, color: Colors.white),
+          tooltip: 'พิมพ์บันทึกรายการ',
+          onPressed: () => showConversationalEntrySheet(context),
+          child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,
           onDestinationSelected: (i) => setState(() => _index = i),
           backgroundColor: AppColors.white,
-          indicatorColor: AppColors.mint.withOpacity(0.15),
+          indicatorColor: AppColors.mint.withValues(alpha: 0.15),
           destinations: const [
             NavigationDestination(
                 icon: Icon(Icons.dashboard_outlined),
@@ -89,9 +89,7 @@ class _HomeShellState extends State<HomeShell> {
                 icon: Icon(Icons.emoji_events_outlined),
                 selectedIcon: Icon(Icons.emoji_events),
                 label: 'ภารกิจ'),
-            NavigationDestination(
-                icon: Icon(Icons.history),
-                label: 'ประวัติ'),
+            NavigationDestination(icon: Icon(Icons.history), label: 'ประวัติ'),
             NavigationDestination(
                 icon: Icon(Icons.settings_outlined),
                 selectedIcon: Icon(Icons.settings),

@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../widgets/goal_card.dart';
+import '../widgets/conversational_entry_sheet.dart';
 import 'goal_detail_screen.dart';
 import 'add_saving_screen.dart';
 import 'scan_slip_screen.dart';
@@ -69,7 +70,8 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () => Navigator.push(context,
+                      onPressed: () => Navigator.push(
+                          context,
                           MaterialPageRoute(
                               builder: (_) => const AddSavingScreen())),
                       icon: const Icon(Icons.add, size: 18),
@@ -86,11 +88,12 @@ class DashboardScreen extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(999)),
                       ),
-                      onPressed: () => Navigator.push(context,
+                      onPressed: () => Navigator.push(
+                          context,
                           MaterialPageRoute(
                               builder: (_) => const ScanSlipScreen())),
-                      icon: const Icon(Icons.document_scanner_outlined,
-                          size: 18),
+                      icon:
+                          const Icon(Icons.document_scanner_outlined, size: 18),
                       label: const Text('สแกนสลิป'),
                     ),
                   ),
@@ -99,6 +102,9 @@ class DashboardScreen extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+
+        const ConversationalEntryLauncher(),
         const SizedBox(height: 16),
 
         // ยอดรวม
@@ -122,8 +128,7 @@ class DashboardScreen extends StatelessWidget {
                               color: AppColors.deepGreen)),
                     ],
                   ),
-                  Text(
-                      'จากเป้าหมาย ${formatMoney(app.grandTargetSatang)}',
+                  Text('จากเป้าหมาย ${formatMoney(app.grandTargetSatang)}',
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.mutedText)),
                 ],
@@ -146,7 +151,8 @@ class DashboardScreen extends StatelessWidget {
         // Stats
         Row(
           children: [
-            _stat('กระปุกกำลังออม', '${app.activeGoals.length}', AppColors.mint),
+            _stat(
+                'กระปุกกำลังออม', '${app.activeGoals.length}', AppColors.mint),
             const SizedBox(width: 12),
             _stat('ยังไม่จัดสรร', formatMoney(app.unallocatedSatang),
                 AppColors.coral),
@@ -157,8 +163,8 @@ class DashboardScreen extends StatelessWidget {
         // รายรับ-รายจ่ายเดือนนี้ (MAKE-style)
         InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const LedgerScreen())),
+          onTap: () => Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const LedgerScreen())),
           child: _card(
             child: Row(
               children: [
@@ -228,14 +234,12 @@ class DashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style:
-                      const TextStyle(fontSize: 12, color: AppColors.mutedText)),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.mutedText)),
               const SizedBox(height: 4),
               Text(value,
                   style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: color)),
+                      fontSize: 18, fontWeight: FontWeight.bold, color: color)),
             ],
           ),
         ),
@@ -260,8 +264,10 @@ class _Chart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final days = List.generate(7, (i) => DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: 6 - i)));
+    final days = List.generate(
+        7,
+        (i) => DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: 6 - i)));
     final totals = days.map((d) {
       return app.transactions
           .where((t) =>
@@ -269,8 +275,7 @@ class _Chart extends StatelessWidget {
               t.date.year == d.year &&
               t.date.month == d.month &&
               t.date.day == d.day)
-          .fold<int>(0, (sum, transaction) =>
-              sum + transaction.amountSatang);
+          .fold<int>(0, (sum, transaction) => sum + transaction.amountSatang);
     }).toList();
 
     return LineChart(
@@ -295,7 +300,7 @@ class _Chart extends StatelessWidget {
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: AppColors.mint.withOpacity(0.2),
+              color: AppColors.mint.withValues(alpha: 0.2),
             ),
           ),
         ],

@@ -61,8 +61,7 @@ class LedgerScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('รายการ',
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text('รายการ', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           if (entries.isEmpty)
             const Text('ยังไม่มีรายการ',
@@ -79,6 +78,7 @@ class LedgerScreen extends StatelessWidget {
                     child: const Icon(Icons.delete, color: Colors.white),
                   ),
                   child: ListTile(
+                    onTap: () => _editDialog(context, app, e),
                     contentPadding: EdgeInsets.zero,
                     leading: CircleAvatar(
                       backgroundColor: AppColors.cream,
@@ -86,14 +86,40 @@ class LedgerScreen extends StatelessWidget {
                     ),
                     title: Text(e.category),
                     subtitle: Text(
-                        '${formatThaiDate(e.date, short: true)}${e.note.isNotEmpty ? ' · ${e.note}' : ''}'),
-                    trailing: Text(
-                      '${e.type == LedgerType.income ? '+' : '-'}${formatMoney(e.amountSatang)}',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: e.type == LedgerType.income
-                              ? AppColors.mint
-                              : AppColors.coral),
+                        '${formatThaiDate(e.date.toLocal(), short: true)}${e.note.isNotEmpty ? ' · ${e.note}' : ''}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${e.type == LedgerType.income ? '+' : '-'}${formatMoney(e.amountSatang)}',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: e.type == LedgerType.income
+                                  ? AppColors.mint
+                                  : AppColors.coral),
+                        ),
+                        PopupMenuButton<String>(
+                          key: ValueKey('ledger-actions-${e.id}'),
+                          tooltip: 'จัดการรายการ',
+                          onSelected: (action) {
+                            if (action == 'edit') {
+                              _editDialog(context, app, e);
+                            } else {
+                              _confirmDelete(context, app, e);
+                            }
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: Text('แก้ไข'),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Text('ลบ'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 )),
@@ -107,7 +133,8 @@ class LedgerScreen extends StatelessWidget {
         child: Column(
           children: [
             Text(label,
-                style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
+                style:
+                    const TextStyle(fontSize: 12, color: AppColors.mutedText)),
             Text(formatMoney(valueSatang),
                 style: TextStyle(fontWeight: FontWeight.bold, color: color)),
           ],
@@ -143,15 +170,17 @@ class LedgerScreen extends StatelessWidget {
               const SizedBox(height: 12),
               SegmentedButton<LedgerType>(
                 segments: const [
-                  ButtonSegment(value: LedgerType.expense, label: Text('รายจ่าย')),
-                  ButtonSegment(value: LedgerType.income, label: Text('รายรับ')),
+                  ButtonSegment(
+                      value: LedgerType.expense, label: Text('รายจ่าย')),
+                  ButtonSegment(
+                      value: LedgerType.income, label: Text('รายรับ')),
                 ],
                 selected: {type},
                 onSelectionChanged: (s) => setLocal(() {
                   type = s.first;
                   category = (type == LedgerType.income
-                      ? incomeCategories
-                      : expenseCategories)
+                          ? incomeCategories
+                          : expenseCategories)
                       .first;
                 }),
               ),
@@ -185,7 +214,8 @@ class LedgerScreen extends StatelessWidget {
               const SizedBox(height: 12),
               TextField(
                 controller: noteCtrl,
-                decoration: const InputDecoration(labelText: 'บันทึก (ไม่บังคับ)'),
+                decoration:
+                    const InputDecoration(labelText: 'บันทึก (ไม่บังคับ)'),
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -210,5 +240,180 @@ class LedgerScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _editDialog(
+    BuildContext context,
+    AppState app,
+    LedgerEntry entry,
+  ) async {
+    var type = entry.type;
+    var category = entry.category;
+    var date = entry.date;
+    final amountCtrl = TextEditingController(
+      text: formatMoneyInput(entry.amountSatang),
+    );
+    final noteCtrl = TextEditingController(text: entry.note);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final categories = <String>{
+            category,
+            ...(type == LedgerType.income
+                ? incomeCategories
+                : expenseCategories),
+          }.toList();
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              MediaQuery.viewInsetsOf(ctx).bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'แก้ไขรายการ',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<LedgerType>(
+                    segments: const [
+                      ButtonSegment(
+                        value: LedgerType.expense,
+                        label: Text('รายจ่าย'),
+                      ),
+                      ButtonSegment(
+                        value: LedgerType.income,
+                        label: Text('รายรับ'),
+                      ),
+                    ],
+                    selected: {type},
+                    onSelectionChanged: (selection) => setLocal(() {
+                      type = selection.first;
+                      category = (type == LedgerType.income
+                              ? incomeCategories
+                              : expenseCategories)
+                          .first;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => setLocal(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'จำนวนเงิน',
+                      prefixText: '฿ ',
+                      errorText: moneyInputError(amountCtrl.text),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: category,
+                    decoration: const InputDecoration(labelText: 'หมวด'),
+                    items: [
+                      for (final value in categories)
+                        DropdownMenuItem(value: value, child: Text(value)),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setLocal(() => category = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: noteCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'บันทึก (ไม่บังคับ)'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final selected = await showDatePicker(
+                        context: ctx,
+                        initialDate: date.toLocal(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now().add(
+                          const Duration(days: 3650),
+                        ),
+                      );
+                      if (selected != null) {
+                        setLocal(() => date = selected.toUtc());
+                      }
+                    },
+                    icon: const Icon(Icons.calendar_today_outlined),
+                    label: Text(formatThaiDate(date.toLocal())),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: moneyInputError(amountCtrl.text) == null
+                          ? () {
+                              app.updateLedgerEntry(
+                                id: entry.id,
+                                type: type,
+                                amountSatang:
+                                    parseMoneyToSatang(amountCtrl.text)!,
+                                category: category,
+                                note: noteCtrl.text.trim(),
+                                date: date,
+                              );
+                              Navigator.pop(ctx);
+                            }
+                          : null,
+                      child: const Text('บันทึกการแก้ไข'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    // รอ reverse animation ถอด TextField ออกจาก tree ก่อนคืน controller
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    amountCtrl.dispose();
+    noteCtrl.dispose();
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    AppState app,
+    LedgerEntry entry,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ลบรายการนี้ไหม?'),
+        content: Text(
+          '${entry.category} ${formatMoney(entry.amountSatang)} จะถูกลบออกจากบัญชี',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ยังไม่ลบ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ลบรายการ'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) app.deleteLedger(entry.id);
   }
 }

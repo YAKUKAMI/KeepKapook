@@ -27,6 +27,12 @@ void main() {
     expect(formatMoney(125050), '฿1,250.50');
   });
 
+  test('formatMoneyInput คืนค่าพร้อมใส่กลับช่องแก้ไขโดยไม่ใช้ double', () {
+    expect(formatMoneyInput(100), '1');
+    expect(formatMoneyInput(101), '1.01');
+    expect(formatMoneyInput(125050), '1250.50');
+  });
+
   test('เพดานออมรายวันคืนค่าเป็นสตางค์', () {
     expect(dailyDepositCapSatang('child', 1), 5000);
     expect(dailyDepositCapSatang('adult', 4), 100000);
