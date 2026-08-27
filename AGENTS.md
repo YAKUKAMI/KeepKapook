@@ -42,13 +42,16 @@ lib/
 ├─ theme/app_theme.dart      สีแบรนด์ (AppColors) + ThemeData
 ├─ models/models.dart        Goal, SavingTransaction, LedgerEntry, Quest,
 │                            AchievementBadge, AppUser + enums
-├─ state/app_state.dart      AppState (ChangeNotifier): ทุก action + persist + _initEmpty()
+├─ state/app_state.dart      AppState (ChangeNotifier): action หลัก + persist + _initEmpty()
+├─ state/conversational_entries.dart  part: save/undo + แก้ไข/ลบประวัติ
 ├─ state/migrations.dart     schemaVersion + migration แบบต่อขั้น v1→v2→v3
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
-├─ widgets/                  goal_card, celebration, simulation_notice
+├─ utils/parser/             pure-Dart parser + models + dictionary
+├─ widgets/                  goal_card, celebration, simulation_notice,
+│                            conversational_entry_sheet
 └─ screens/                  dashboard, goals, goal_detail, new_goal, add_saving,
                              scan_slip, quests, achievements, history, unallocated,
                              settings, ledger, onboarding
@@ -60,10 +63,15 @@ test/
 ├─ money_test.dart
 ├─ coach_test.dart
 ├─ backup_test.dart
-└─ app_state_money_test.dart
+├─ app_state_money_test.dart
+├─ parser_test.dart          corpus accuracy + parser edge cases
+├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
+├─ historical_edit_test.dart       edit/delete history + ledger
+└─ fixtures/parser_corpus.dart     corpus 35 ประโยค (support file ไม่ใช่ test entrypoint)
 ```
 
-**หนี้โครงสร้างที่รู้ตัว:** `models.dart` และ `app_state.dart` เป็น god file
+**หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 647 บรรทัดแม้แยก conversational action
+เป็น part แล้ว; `models.dart` ยังรวมทุก entity ไว้ไฟล์เดียว
 ถ้าไฟล์ไหนเกิน ~800 บรรทัด ให้แตกก่อนเพิ่มโค้ดใหม่
 (`models/` แยกตาม entity, `state/` แยกเป็น mixin/part ตามโดเมน: goal / ledger / gamification)
 
@@ -103,6 +111,7 @@ test/
 ```
 
 - สถานะการโหลดปัจจุบัน: ข้อมูลไม่มี `schemaVersion` ถือเป็น v1 แล้วเขียนกลับพร้อม version; ถ้า parse ไม่ผ่านหรือ version ใหม่กว่าแอป จะสำรอง raw JSON และแสดง `MaterialBanner` ภาษาไทยก่อนใช้ state ว่าง
+- ชื่อ key ลงท้าย `_v1` เป็นชื่อ storage key เดิมเพื่อรักษาความเข้ากันได้ ไม่ใช่เลข schema ปัจจุบัน; schema ใน JSON คือ v2
 - **ทุกครั้งที่เพิ่ม/เปลี่ยน/ลบ field ใน model ต้องเพิ่ม `schemaVersion` และเขียน migration**
   ค่า version ปัจจุบันและ migration steps อยู่ใน `lib/state/migrations.dart`
 - `fromJson` ทุกตัวต้องทนข้อมูลเก่า: field ที่เพิ่มใหม่ต้องมี default ไม่ใช่ `!`
@@ -130,6 +139,7 @@ test/
 - นิยาม "วัน" = local midnight (Asia/Bangkok) ใช้ helper ตัวเดียวกันทั้งแอป ห้ามคำนวณ `DateTime.now().difference()` ตรงๆ ในหน้าจอ
 - ฟีเจอร์ที่ผูกกับวัน: กราฟ 7 วัน, streak, ล็อกเงิน 7/30/90 วัน, quest รายวัน
 - ล็อกเงินต้องเทียบกับ `unlockAt` ที่บันทึกไว้ ไม่ใช่นับถอยหลังจากเวลาปัจจุบัน (กันผู้ใช้หมุนนาฬิกาเครื่อง)
+- **สถานะโค้ดปัจจุบันยังไม่ทำตามกฎนี้ครบ:** timestamp บาง action ยังสร้างจาก local `DateTime.now()`, กราฟ 7 วันคำนวณใน `dashboard_screen.dart` และเทียบ `t.date` ตรงๆ โดยไม่แปลง timezone; ต้องแก้แยกรอบพร้อม test
 
 ---
 
@@ -144,6 +154,8 @@ test/
 - **MAKE-style (จำลองทั้งหมด):** รายรับ-รายจ่าย (ledger + หมวดหมู่ + สรุปเดือน), Cloud Pocket ยืดหยุ่น, โอนระหว่างกระปุก, ล็อกเงิน 7/30/90 วัน, ออมด้วยกัน/แชร์ (mock members), ถอนออก
 - **ไม่มีข้อมูล mock** — เริ่มว่างเปล่าผ่าน onboarding, Settings มี "ล้างข้อมูลทั้งหมด"
 - **สำรอง/กู้คืนข้อมูล:** export JSON ออกนอกแอปและ import พร้อม preview/ยืนยัน โดยทำงานบน web และ mobile
+- **Conversational Ledger:** deterministic pure-Dart parser, confidence tier, บันทึกทันทีพร้อม undo, chip แก้ field, คำถามเมื่อกำกวม และแก้/ลบย้อนหลังจาก History/Ledger
+- **ข้อจำกัดที่พบจากโค้ดจริง:** quest มี 4 id แต่เพิ่ม progress เฉพาะ `q-deposit`; badge มี 6 id แต่ recompute เฉพาะ 4 id; `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
 
 ---
 
@@ -155,7 +167,8 @@ flutter run -d chrome        # หรือ device/emulator
 
 flutter analyze lib          # ต้อง 0 error
 flutter test                 # ต้องเขียวทั้งหมด
-flutter build web            # ใช้ verify compile (เครื่อง dev ยังไม่มี Android SDK)
+flutter build web            # verify web compile
+flutter build apk --release  # Android SDK ติดตั้งแล้ว; APK release เคย build ผ่าน
 ```
 
 ### Definition of Done — บังคับทุกงาน
@@ -255,20 +268,28 @@ Future<void> addSaving(String goalId, int amountSatang, {DateTime? at}) async {
 - [x] Export / Import ข้อมูลเป็นไฟล์ JSON พร้อม validate, migration, preview และ pre-import backup
 - [x] Disclaimer "ไม่ใช่แอปธนาคาร ไม่มีเงินจริง" ใน onboarding + Settings
       และ label "จำลอง" บนหน้าจอ โอน / ล็อก / ออมด้วยกัน / ถอนออก
-- [ ] Unit test ของ logic การเงิน: `format.dart` (EXP/level/เพดาน), `coach.dart` (planStatus, recoveryOptions), AppState (โอน, ล็อก, overflow→unallocated, ถอน)
-- [ ] `applicationId` จริง (เลิกใช้ `com.example.keepkapook`) + app icon + signing
-- [ ] ลอง `flutter build apk` ให้ผ่านสักครั้ง (ยังไม่เคยทำเลย)
+- [x] Unit test ของ money parser/format, เพดาน, `coach.dart`, โอน, overflow, edit/delete และยอดรวมไม่เพี้ยน
+- [ ] เพิ่ม unit test ที่ยังขาด: EXP/level boundary, lock และ withdraw โดยตรง
+- [x] `applicationId` / bundle id เป็น `com.keepkapook` + app icon Android/iOS/web
+- [x] `flutter build apk --release` เคยผ่าน (ปัจจุบันยังเซ็นด้วย debug certificate)
+- [ ] ทำ release signing/upload key จริง ห้าม commit secret/keystore
 - [ ] Privacy policy + นโยบายรูปสลิป (มี PII: เลขบัญชี/ชื่อ) — ไม่อัปโหลดออกนอกเครื่อง, ขอ permission ให้ถูก
 
 ### P1 — ฟีเจอร์ที่ควรมี เรียงตามผลต่อ retention
 - [ ] **Streak + ปฏิทินการออม** — แกน "ไม่เลิกกลางทาง" ที่ยังหายไป ถูกและตรง positioning ที่สุด
 - [ ] **Local notification เตือนออม** (`flutter_local_notifications`, ทำงาน offline) — habit app ที่ไม่เตือนคือรอให้ผู้ใช้ลืม
-- [ ] **แก้ไขเป้าหมาย / แก้-ลบรายการย้อนหลัง + undo** — ตอนนี้กรอกผิดแล้วแก้ไม่ได้
+- [ ] **แก้ไขเป้าหมาย** — ส่วนแก้/ลบรายการย้อนหลังและ undo ของ conversational entry ทำแล้ว
 - [ ] **Insight รายจ่ายที่แปลงเป็นเวลา** — ไม่ใช่แค่ pie chart แต่ "ลดกาแฟสัปดาห์ละ 2 แก้ว = ถึงเป้าเร็วขึ้น 12 วัน" ← จุดที่ MAKE ไม่ทำ
 - [ ] **Challenge การออม** — ออม 365 วันทวีคูณ / สัปดาห์ไม่ใช้เงิน / เก็บเศษสตางค์ (ต่อยอด quest+badge ที่มีอยู่)
 - [ ] **สรุปรายสัปดาห์-เดือน แชร์เป็นรูป** — growth loop ที่ไม่ต้องซื้อโฆษณา
 - [ ] debounce + error handling ใน `_save()`
 - [ ] CI (GitHub Actions): analyze + test + build web ทุก PR
+- [ ] แก้ `createPocket()` target 0 ทำให้ `addSaving()` ใส่ 0 และส่งยอดทั้งหมดไป unallocated
+- [ ] แก้กราฟ 7 วันที่นับทุก transaction ยกเว้น withdraw (รวม transfer/unallocated/adjust/slip)
+- [ ] ทำ progress logic ให้ quest `q-allocate`, `q-weekly-review`, `q-weekly-consistency` และ badge `b-rhythm`, `b-memory`
+- [ ] เพิ่ม category selector ใน NewGoal และกำหนดพฤติกรรมของ `GoalPriority` (ปัจจุบัน persist อย่างเดียว)
+- [ ] เพิ่มปลายทาง transfer แบบ id ใน `SavingTransaction`; ปัจจุบันเก็บต้นทางใน `goalId` และชื่อปลายทางใน `note`
+- [ ] รวม date/time calculation ไว้ helper กลางและทำ UTC/local boundary ให้สม่ำเสมอ
 
 ### P2
 - [ ] Quick add / home screen widget + ปุ่มจำนวนที่ใช้บ่อย (20/50/100)
@@ -277,7 +298,7 @@ Future<void> addSaving(String goalId, int amountSatang, {DateTime? at}) async {
 - [ ] Goal Album (รูปเป้าหมาย)
 - [ ] bundle ฟอนต์ Prompt เข้า assets
 - [ ] crash reporting + analytics (รู้ว่าผู้ใช้เลิกตรงไหน)
-- [ ] แตก god file `models.dart` / `app_state.dart`
+- [ ] แตก god file `models.dart` / `app_state.dart` ต่อ (`app_state.dart` ยัง 647 บรรทัด; conversational part แยกแล้ว)
 - [ ] OCR อ่านสลิปอัตโนมัติ — `google_mlkit_text_recognition` mobile-only ต้อง conditional import + stub สำหรับ web ไม่งั้น `flutter build web` พัง
 
 ### ไม่ทำ (out of scope)
