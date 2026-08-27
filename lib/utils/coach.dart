@@ -27,6 +27,7 @@ int _clampInt(int value, int minimum, int maximum) {
 }
 
 PlanStatus planStatus(Goal g) {
+  if (!g.hasSavingsTarget) return PlanStatus(false, 0, 100);
   final total = _clampInt(
     g.targetDate.difference(g.startDate).inDays,
     1,
@@ -64,6 +65,9 @@ class RecoveryOptions {
 
 RecoveryOptions recoveryOptions(
     Goal g, PlanStatus status, int avgPerDaySatang) {
+  if (!g.hasSavingsTarget) {
+    throw ArgumentError.value(g, 'g', 'กระเป๋า flexible ไม่มีแผนเป้าหมาย');
+  }
   final remainingSatang = g.remainingSatang;
   final left = _clampInt(daysLeft(g.targetDate), 1, 1 << 30);
   final catchUpDays = _clampInt(left, 3, 7);
@@ -76,15 +80,14 @@ RecoveryOptions recoveryOptions(
       _ceilDivision(remainingSatang, paceSatang <= 0 ? 1 : paceSatang);
   final extendDays = _clampInt(neededDays - left, 3, 1 << 30);
   final reachableSatang = g.currentSatang + (paceSatang * left);
-  final minimumTargetSatang =
-      _clampInt(g.currentSatang + 1, 0, g.targetSatang);
+  final minimumTargetSatang = _clampInt(g.currentSatang + 1, 0, g.targetSatang);
   final reducedTargetSatang = _clampInt(
     reachableSatang,
     minimumTargetSatang,
     g.targetSatang,
   );
-  return RecoveryOptions(catchUpPerDaySatang, catchUpDays, extendDays,
-      reducedTargetSatang);
+  return RecoveryOptions(
+      catchUpPerDaySatang, catchUpDays, extendDays, reducedTargetSatang);
 }
 
 int averageDepositPerDaySatang(

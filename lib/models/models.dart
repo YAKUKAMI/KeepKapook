@@ -128,15 +128,24 @@ class Goal {
     this.lockUntil,
     this.shared = false,
     List<String>? members,
-  }) : members = members ?? [];
+  }) : members = members ?? [] {
+    if (flexible) {
+      status = GoalStatus.active;
+      completedDate = null;
+    }
+  }
 
+  bool get hasSavingsTarget => !flexible && targetSatang > 0;
+  bool get isCompleted => hasSavingsTarget && status == GoalStatus.completed;
   double get progress =>
-      targetSatang <= 0 ? 0 : (currentSatang / targetSatang).clamp(0, 1);
+      hasSavingsTarget ? (currentSatang / targetSatang).clamp(0, 1) : 0;
   int get remainingSatang {
+    if (!hasSavingsTarget) return 0;
     final remaining = targetSatang - currentSatang;
     if (remaining <= 0) return 0;
     return remaining > targetSatang ? targetSatang : remaining;
   }
+
   bool get isLockedNow =>
       locked && (lockUntil == null || lockUntil!.isAfter(DateTime.now()));
 

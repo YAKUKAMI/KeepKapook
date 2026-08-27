@@ -299,7 +299,11 @@ extension ConversationalEntryActions on AppState {
 
   void _refreshGoalStatuses(DateTime at) {
     for (final goal in goals) {
-      if (goal.targetSatang > 0 && goal.currentSatang >= goal.targetSatang) {
+      if (goal.flexible) {
+        goal.status = GoalStatus.active;
+        goal.completedDate = null;
+      } else if (goal.hasSavingsTarget &&
+          goal.currentSatang >= goal.targetSatang) {
         goal.status = GoalStatus.completed;
         goal.completedDate ??= at;
       } else if (goal.status == GoalStatus.completed) {

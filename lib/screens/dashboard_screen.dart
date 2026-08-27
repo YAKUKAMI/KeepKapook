@@ -21,7 +21,7 @@ class DashboardScreen extends StatelessWidget {
     final lp = levelProgress(app.user.exp);
     final overall = app.grandTargetSatang <= 0
         ? 0.0
-        : app.totalSavedSatang / app.grandTargetSatang;
+        : app.targetedSavedSatang / app.grandTargetSatang;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),

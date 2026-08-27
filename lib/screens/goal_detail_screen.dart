@@ -27,9 +27,10 @@ class GoalDetailScreen extends StatelessWidget {
 
     // ความเร็วออมเฉลี่ย + สถานะแผน (สำหรับ Recovery)
     final avgPerDaySatang = averageDepositPerDaySatang(txs, goal.startDate);
-    final plan = planStatus(goal);
-    final recovery =
-        plan.behind ? recoveryOptions(goal, plan, avgPerDaySatang) : null;
+    final plan = goal.flexible ? null : planStatus(goal);
+    final recovery = plan != null && plan.behind
+        ? recoveryOptions(goal, plan, avgPerDaySatang)
+        : null;
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -105,7 +106,10 @@ class GoalDetailScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          _row('ยอดปัจจุบัน', formatMoney(goal.currentSatang)),
+          _row(
+            goal.flexible ? 'ยอดสะสม' : 'ยอดปัจจุบัน',
+            formatMoney(goal.currentSatang),
+          ),
           if (!goal.flexible) ...[
             _row('เป้าหมาย', formatMoney(goal.targetSatang)),
             _row('เหลืออีก', formatMoney(goal.remainingSatang)),
@@ -164,11 +168,11 @@ class GoalDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          if (goal.status == GoalStatus.active && recovery != null) ...[
+          if (!goal.isCompleted && plan != null && recovery != null) ...[
             _recoveryCard(context, app, goal, plan, recovery),
             const SizedBox(height: 20),
           ],
-          if (goal.status == GoalStatus.active)
+          if (!goal.isCompleted)
             FilledButton.icon(
               onPressed: () => Navigator.push(
                 context,

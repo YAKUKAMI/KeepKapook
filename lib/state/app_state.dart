@@ -322,7 +322,10 @@ class AppState extends ChangeNotifier {
         : validatedAmountSatang;
     if (takeSatang <= 0) return;
     g.currentSatang -= takeSatang;
-    if (g.status == GoalStatus.completed && g.currentSatang < g.targetSatang) {
+    if (g.flexible) {
+      g.status = GoalStatus.active;
+      g.completedDate = null;
+    } else if (g.isCompleted && g.currentSatang < g.targetSatang) {
       g.status = GoalStatus.active;
       g.completedDate = null;
     }
@@ -358,7 +361,14 @@ class AppState extends ChangeNotifier {
     if (moveSatang <= 0) return;
     from.currentSatang -= moveSatang;
     to.currentSatang += moveSatang;
-    if (to.targetSatang > 0 && to.currentSatang >= to.targetSatang) {
+    if (from.flexible) {
+      from.status = GoalStatus.active;
+      from.completedDate = null;
+    }
+    if (to.flexible) {
+      to.status = GoalStatus.active;
+      to.completedDate = null;
+    } else if (to.hasSavingsTarget && to.currentSatang >= to.targetSatang) {
       to.status = GoalStatus.completed;
       to.completedDate = DateTime.now();
     }
@@ -397,12 +407,16 @@ class AppState extends ChangeNotifier {
   // ---------- derived ----------
   int get totalSavedSatang =>
       goals.fold<int>(0, (sum, goal) => sum + goal.currentSatang);
-  int get grandTargetSatang =>
-      goals.fold<int>(0, (sum, goal) => sum + goal.targetSatang);
+  int get targetedSavedSatang => goals
+      .where((goal) => goal.hasSavingsTarget)
+      .fold<int>(0, (sum, goal) => sum + goal.currentSatang);
+  int get grandTargetSatang => goals
+      .where((goal) => goal.hasSavingsTarget)
+      .fold<int>(0, (sum, goal) => sum + goal.targetSatang);
   List<Goal> get activeGoals =>
-      goals.where((g) => g.status == GoalStatus.active).toList();
+      goals.where((goal) => !goal.isCompleted).toList();
   List<Goal> get completedGoals =>
-      goals.where((g) => g.status == GoalStatus.completed).toList();
+      goals.where((goal) => goal.isCompleted).toList();
 
   // ---------- actions ----------
   Goal addGoal({
@@ -435,7 +449,10 @@ class AppState extends ChangeNotifier {
 
   void updateGoal(Goal g) {
     _requireGoal(g.id);
-    if (g.currentSatang >= g.targetSatang) {
+    if (g.flexible) {
+      g.status = GoalStatus.active;
+      g.completedDate = null;
+    } else if (g.hasSavingsTarget && g.currentSatang >= g.targetSatang) {
       g.status = GoalStatus.completed;
       g.completedDate ??= DateTime.now();
     }
@@ -485,20 +502,25 @@ class AppState extends ChangeNotifier {
 
     if (goal != null) {
       final g = goal;
-      final spaceSatang = g.remainingSatang;
+      final spaceSatang = g.flexible ? amountSatang : g.remainingSatang;
       final putSatang = amountSatang < spaceSatang ? amountSatang : spaceSatang;
       overflowSatang = amountSatang - putSatang;
-      final before = g.progress;
+      final before = g.flexible ? 0.0 : g.progress;
       g.currentSatang += putSatang;
-      final after = g.progress;
-      final milestones = {0.25: 20, 0.5: 30, 0.75: 40, 1.0: 100};
-      milestones.forEach((m, e) {
-        if (before < m && after >= m) exp += e;
-      });
-      if (after >= 1.0) {
-        g.status = GoalStatus.completed;
-        g.completedDate = now;
-        completed = g;
+      if (g.flexible) {
+        g.status = GoalStatus.active;
+        g.completedDate = null;
+      } else {
+        final after = g.progress;
+        final milestones = {0.25: 20, 0.5: 30, 0.75: 40, 1.0: 100};
+        milestones.forEach((m, e) {
+          if (before < m && after >= m) exp += e;
+        });
+        if (after >= 1.0) {
+          g.status = GoalStatus.completed;
+          g.completedDate = now;
+          completed = g;
+        }
       }
       exp += 10; // base
       transactions.insert(
@@ -617,7 +639,9 @@ class AppState extends ChangeNotifier {
 
   void _recomputeBadges() {
     final completedCount = completedGoals.length;
-    final anyHalf = goals.any((g) => g.progress >= 0.5);
+    final anyHalf = goals.any(
+      (goal) => goal.hasSavingsTarget && goal.progress >= 0.5,
+    );
     for (final b in badges) {
       if (b.id == 'b-first-drop') {
         b.unlocked = transactions.isNotEmpty;

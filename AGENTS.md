@@ -125,6 +125,7 @@ test/
 - Input เงินต้องผ่าน `parseMoneyToSatang()` ตั้งแต่จุดรับค่า และต้องไม่ติดลบ/ไม่เกิน **฿100,000,000 ต่อรายการ** (`10,000,000,000` สตางค์)
 - กฎปัดเศษเดียวทั้ง input และ migration v1→v2 คือ **ปัดครึ่งขึ้น (half-up)**: อ่านทศนิยมบาทหลักที่ 3 ถ้า `>= 5` ให้เพิ่ม 1 สตางค์ เช่น `1.004 → 100`, `1.005 → 101`, `2.675 → 268` สตางค์ โดยห้ามคำนวณผ่าน floating point
 - migration v1→v2 แปลง field เงินหน่วยบาทเดิมทุกตำแหน่งเป็น field `...Satang`; ข้อมูลที่ไม่มี `schemaVersion` ถือเป็น v1 และต้องเปิดใช้ได้โดยยอดไม่เปลี่ยน
+- `Goal.flexible == true` คือกระเป๋าไม่มีเป้าหมาย: รับเงินได้ไม่จำกัด, ไม่มี overflow, progress/remaining ไม่ใช้เป็นความจุ, ไม่ได้ milestone EXP และไม่มีสถานะ completed; UI ต้องแสดง "ยอดสะสม" แทนเปอร์เซ็นต์
 
 ### Export / Import
 
@@ -280,9 +281,9 @@ void someAction(...) {
 - [ ] **Insight รายจ่ายที่แปลงเป็นเวลา** — ไม่ใช่แค่ pie chart แต่ "ลดกาแฟสัปดาห์ละ 2 แก้ว = ถึงเป้าเร็วขึ้น 12 วัน" ← จุดที่ MAKE ไม่ทำ
 - [ ] **Challenge การออม** — ออม 365 วันทวีคูณ / สัปดาห์ไม่ใช้เงิน / เก็บเศษสตางค์ (ต่อยอด quest+badge ที่มีอยู่)
 - [ ] **สรุปรายสัปดาห์-เดือน แชร์เป็นรูป** — growth loop ที่ไม่ต้องซื้อโฆษณา
-- [ ] debounce + error handling ใน `_save()`
+- [x] debounce 300ms + ordered write queue + error reporting ใน `_save()`
 - [ ] CI (GitHub Actions): analyze + test + build web ทุก PR
-- [ ] แก้ `createPocket()` target 0 ทำให้ `addSaving()` ใส่ 0 และส่งยอดทั้งหมดไป unallocated
+- [x] แยก flexible pocket ให้รับเงินไม่จำกัด ไม่มี overflow/progress/milestone/completed
 - [ ] แก้กราฟ 7 วันที่นับทุก transaction ยกเว้น withdraw (รวม transfer/unallocated/adjust/slip)
 - [ ] ทำ progress logic ให้ quest `q-allocate`, `q-weekly-review`, `q-weekly-consistency` และ badge `b-rhythm`, `b-memory`
 - [ ] เพิ่ม category selector ใน NewGoal และกำหนดพฤติกรรมของ `GoalPriority` (ปัจจุบัน persist อย่างเดียว)
