@@ -45,20 +45,24 @@ lib/
 │                            AchievementBadge, AppUser + enums
 ├─ state/app_state.dart      AppState (ChangeNotifier): action หลัก + persist + _initEmpty()
 ├─ state/conversational_entries.dart  part: save/undo + แก้ไข/ลบประวัติ
+├─ state/quick_entries.dart  part: ออม/รายจ่ายเร็ว + snapshot undo ทั้ง state
 ├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3→v4→v5)
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
 ├─ services/notifications/  controller + preference store + conditional mobile implementation/web stub
+├─ services/quick_entry/    controller + SharedPreferences ของจำนวนลัด/หมวดล่าสุด
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
 ├─ utils/financial_summary.dart  pure summaries: goal totals/progress, monthly ledger,
 │                            7-day saving series (รับ `now` จาก caller)
 ├─ utils/habit_streak.dart   pure local-day/streak/grace/calendar/reward summaries
 ├─ utils/notification_schedule.dart  pure daily/weekly schedule + reminder copy
+├─ utils/quick_entry.dart    pure preset validation + goal selection + feedback progress
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
 ├─ utils/parser/             pure-Dart parser + models + dictionary
 ├─ widgets/                  goal_card, celebration, simulation_notice,
 │                            conversational_entry_sheet, habit_calendar_card,
-│                            notification_settings_card
+│                            notification_settings_card, quick_record_sheet,
+│                            quick_amount_settings
 └─ screens/                  dashboard, goals, goal_detail, new_goal, add_saving,
                              scan_slip, quests, achievements, history, unallocated,
                              settings, ledger, onboarding
@@ -80,13 +84,15 @@ test/
 ├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
 ├─ notification_schedule_test.dart / notification_controller_test.dart
 ├─ notification_ui_test.dart       schedule, permission-on-first-save, Settings/web stub
+├─ quick_entry_rules_test.dart      pure preset/goal-selection/feedback rules
+├─ quick_record_test.dart           quick saving/expense/undo/Settings/category memory
 ├─ historical_edit_test.dart       edit/delete history + ledger
 └─ fixtures/parser_corpus.dart     corpus synthetic 37 ประโยค (ยังไม่ใช่ข้อมูลผู้ใช้จริง;
                                     support file ไม่ใช่ test entrypoint)
 ```
 
-**หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 783 บรรทัดแม้แยก conversational action
-เป็น part แล้ว; `models.dart` ยังรวมทุก entity ไว้ไฟล์เดียว
+**หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 850 บรรทัดแม้แยก conversational และ
+quick-entry action เป็น part แล้ว; `models.dart` ยังรวมทุก entity ไว้ไฟล์เดียว
 ถ้าไฟล์ไหนเกิน ~800 บรรทัด ให้แตกก่อนเพิ่มโค้ดใหม่
 (`models/` แยกตาม entity, `state/` แยกเป็น mixin/part ตามโดเมน: goal / ledger / gamification)
 
@@ -100,6 +106,7 @@ test/
 - Corrupt backup key: `keepkapook_state_v1_corrupt_backup`
 - Pre-import backup key: `keepkapook_state_v1_pre_import_backup` — เก็บ state ปัจจุบันก่อนกู้คืนทับทุกครั้ง
 - การตั้งค่า local notification ใช้ SharedPreferences keys prefix `keepkapook_notification_` แยกจาก state JSON; ไม่มีข้อมูลการเงินและไม่ทำให้ schemaVersion เปลี่ยน
+- การตั้งค่าบันทึกเร็วใช้ key `keepkapook_quick_saving_amounts_satang` และ `keepkapook_quick_expense_category` แยกจาก state JSON; ค่าเริ่มต้น 20/50/100 บาทถูกเก็บเป็น 2,000/5,000/10,000 สตางค์ และไม่ทำให้ schemaVersion เปลี่ยน
 - รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 5` และ migration framework ที่ `lib/state/migrations.dart`
 
 ตัวอย่างย่อของ JSON ที่ persist จริงในปัจจุบัน:
@@ -198,6 +205,7 @@ test/
 - **Conversational Ledger:** deterministic pure-Dart parser, confidence tier, บันทึกทันทีพร้อม undo, chip แก้ field, คำถามเมื่อกำกวม และแก้/ลบย้อนหลังจาก History/Ledger
 - **Streak + ปฏิทิน:** current/longest streak, ผ่อนผัน 1 วัน, ปฏิทินเดือนและรายการรายวันบน Dashboard; คำนวณใหม่จากประวัติ ไม่หัก EXP เมื่อขาด
 - **Local notification:** เตือนบันทึกประจำวัน + ดูสรุปเช้าวันจันทร์ ปรับเวลา/ปิดแยกได้, ขอสิทธิ์หลังบันทึกแรก, ทำงานในเครื่อง; web ใช้ stub และซ่อนเมนู
+- **Quick Record:** FAB + Dashboard เข้าถึงออมเร็ว/รายจ่ายเร็วได้โดยไม่เปลี่ยนแท็บ, จำนวนลัด 20/50/100 แก้ได้ใน Settings, จำหมวดรายจ่ายล่าสุด, แสดง progress/ยอดเดือนทันที และ undo ทั้ง state ภายใน 5 วินาที
 - quest ปัจจุบันมี `q-deposit`, `q-allocate`, `q-weekly-consistency` พร้อม event handler; badge default 5 ตัวรวม `b-rhythm` มีเงื่อนไขครบ ส่วน `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
 
 ---
@@ -347,13 +355,14 @@ void someAction(...) {
 - [ ] รวม date/time calculation ไว้ helper กลางและทำ UTC/local boundary ให้สม่ำเสมอ
 
 ### P2
-- [ ] Quick add / home screen widget + ปุ่มจำนวนที่ใช้บ่อย (20/50/100)
+- [x] Quick Record ในแอป + ปุ่มจำนวนที่ใช้บ่อย 20/50/100 + ตั้งค่าเอง + รายจ่ายเร็ว
+- [ ] OS home screen widget สำหรับ quick add (งานคนละส่วนกับ Quick Record ในแอป)
 - [ ] PIN / biometric lock
 - [ ] Cloud sync + login ผ่าน Firebase (ทำหลังมี export แล้ว)
 - [ ] Goal Album (รูปเป้าหมาย)
 - [ ] bundle ฟอนต์ Prompt เข้า assets
 - [ ] crash reporting + analytics (รู้ว่าผู้ใช้เลิกตรงไหน)
-- [ ] แตก god file `models.dart` / `app_state.dart` ต่อ (`app_state.dart` ยัง 783 บรรทัด; conversational part แยกแล้ว)
+- [ ] แตก god file `models.dart` / `app_state.dart` ต่อ (`app_state.dart` ยัง 850 บรรทัด; conversational/quick-entry part แยกแล้ว)
 - [ ] OCR อ่านสลิปอัตโนมัติ — `google_mlkit_text_recognition` mobile-only ต้อง conditional import + stub สำหรับ web ไม่งั้น `flutter build web` พัง
 
 ### ไม่ทำ (out of scope)

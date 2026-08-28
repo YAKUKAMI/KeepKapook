@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/backup_file_service.dart';
 import '../services/notifications/notification_controller.dart';
+import '../services/quick_entry/quick_entry_controller.dart';
 import '../state/app_state.dart';
 import '../state/backup.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../utils/notification_schedule.dart';
 import '../widgets/notification_settings_card.dart';
+import '../widgets/quick_amount_settings.dart';
 import '../widgets/simulation_notice.dart';
 import 'achievements_screen.dart';
 import 'unallocated_screen.dart';
@@ -22,6 +24,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final notifications = context.watch<NotificationController?>();
+    final quickEntries = context.watch<QuickEntryController?>();
     final notificationGoalName = selectReminderGoalName(
       app.activeGoals.map((goal) => goal.name),
     );
@@ -77,6 +80,10 @@ class SettingsScreen extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.mutedText)),
             ]),
+            if (quickEntries != null)
+              _section('ปุ่มออมเร็ว', [
+                QuickAmountSettings(controller: quickEntries),
+              ]),
             if (notifications?.isSupported ?? false)
               NotificationSettingsCard(
                 controller: notifications!,

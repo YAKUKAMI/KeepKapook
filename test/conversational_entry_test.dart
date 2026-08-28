@@ -183,7 +183,7 @@ void main() {
     await app.flushPendingSaves();
   });
 
-  testWidgets('FAB เปิดช่องพิมพ์ได้โดยไม่เปลี่ยนแท็บ', (tester) async {
+  testWidgets('FAB เปิดบันทึกเร็วได้โดยไม่เปลี่ยนแท็บ', (tester) async {
     final app = createReadyApp();
     await tester.pumpWidget(
       ChangeNotifierProvider<AppState>.value(
@@ -193,11 +193,11 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byTooltip('พิมพ์บันทึกรายการ'), findsOneWidget);
-    await tester.tap(find.byTooltip('พิมพ์บันทึกรายการ'));
+    expect(find.byTooltip('บันทึกเร็ว'), findsOneWidget);
+    await tester.tap(find.byTooltip('บันทึกเร็ว'));
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const Key('conversational_entry_input')),
+      find.byKey(const Key('quick-saving-5000')),
       findsOneWidget,
     );
     expect(find.text('ภาพรวม'), findsOneWidget);
