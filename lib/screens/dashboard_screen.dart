@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
-import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 import '../widgets/goal_card.dart';
+import '../widgets/conversational_entry_sheet.dart';
+import '../widgets/habit_calendar_card.dart';
 import 'goal_detail_screen.dart';
 import 'add_saving_screen.dart';
 import 'scan_slip_screen.dart';
@@ -18,7 +20,15 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final lp = levelProgress(app.user.exp);
-    final overall = app.grandTarget <= 0 ? 0.0 : app.totalSaved / app.grandTarget;
+    final now = DateTime.now();
+    final money = summarizeDashboardMoney(
+      goals: app.goals,
+      ledger: app.ledger,
+      transactions: app.transactions,
+      now: now,
+    );
+    final habitEntries = app.habitEntries;
+    final habit = app.habitSummary(now: now);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -55,7 +65,7 @@ class DashboardScreen extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),
                 child: LinearProgressIndicator(
-                  value: lp.need == 0 ? 0 : lp.inLevel / lp.need,
+                  value: lp.progress,
                   minHeight: 8,
                   backgroundColor: Colors.black12,
                   valueColor:
@@ -67,7 +77,8 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () => Navigator.push(context,
+                      onPressed: () => Navigator.push(
+                          context,
                           MaterialPageRoute(
                               builder: (_) => const AddSavingScreen())),
                       icon: const Icon(Icons.add, size: 18),
@@ -84,11 +95,12 @@ class DashboardScreen extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(999)),
                       ),
-                      onPressed: () => Navigator.push(context,
+                      onPressed: () => Navigator.push(
+                          context,
                           MaterialPageRoute(
                               builder: (_) => const ScanSlipScreen())),
-                      icon: const Icon(Icons.document_scanner_outlined,
-                          size: 18),
+                      icon:
+                          const Icon(Icons.document_scanner_outlined, size: 18),
                       label: const Text('สแกนสลิป'),
                     ),
                   ),
@@ -96,6 +108,16 @@ class DashboardScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 16),
+
+        const ConversationalEntryLauncher(),
+        const SizedBox(height: 16),
+
+        HabitCalendarCard(
+          summary: habit,
+          entries: habitEntries,
+          today: now,
         ),
         const SizedBox(height: 16),
 
@@ -113,14 +135,14 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       const Text('ยอดออมรวม',
                           style: TextStyle(color: AppColors.mutedText)),
-                      Text(formatMoney(app.totalSaved),
+                      Text(formatMoney(money.goals.totalSavedSatang),
                           style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
                               color: AppColors.deepGreen)),
                     ],
                   ),
-                  Text('จากเป้าหมาย ${formatMoney(app.grandTarget)}',
+                  Text('จากเป้าหมาย ${formatMoney(money.goals.targetSatang)}',
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.mutedText)),
                 ],
@@ -129,7 +151,7 @@ class DashboardScreen extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),
                 child: LinearProgressIndicator(
-                  value: overall.clamp(0, 1),
+                  value: money.goals.targetProgress,
                   minHeight: 8,
                   backgroundColor: Colors.black12,
                   valueColor: const AlwaysStoppedAnimation(AppColors.mint),
@@ -143,9 +165,11 @@ class DashboardScreen extends StatelessWidget {
         // Stats
         Row(
           children: [
-            _stat('กระปุกกำลังออม', '${app.activeGoals.length}', AppColors.mint),
+            _stat(
+                'กระปุกกำลังออม', '${app.activeGoals.length}', AppColors.mint),
             const SizedBox(width: 12),
-            _stat('ยังไม่จัดสรร', formatMoney(app.unallocated), AppColors.coral),
+            _stat('ยังไม่จัดสรร', formatMoney(app.unallocatedSatang),
+                AppColors.coral),
           ],
         ),
         const SizedBox(height: 16),
@@ -153,8 +177,8 @@ class DashboardScreen extends StatelessWidget {
         // รายรับ-รายจ่ายเดือนนี้ (MAKE-style)
         InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const LedgerScreen())),
+          onTap: () => Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const LedgerScreen())),
           child: _card(
             child: Row(
               children: [
@@ -166,14 +190,13 @@ class DashboardScreen extends StatelessWidget {
                           style: TextStyle(
                               fontWeight: FontWeight.w600, fontSize: 13)),
                       const SizedBox(height: 4),
-                      Text(
-                          'คงเหลือ ${formatMoney(app.monthIncome - app.monthExpense)}',
+                      Text('คงเหลือ ${formatMoney(money.month.netSatang)}',
                           style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: AppColors.deepGreen)),
                       Text(
-                          'รับ ${formatMoney(app.monthIncome)} · จ่าย ${formatMoney(app.monthExpense)}',
+                          'รับ ${formatMoney(money.month.incomeSatang)} · จ่าย ${formatMoney(money.month.expenseSatang)}',
                           style: const TextStyle(
                               fontSize: 11, color: AppColors.mutedText)),
                     ],
@@ -194,7 +217,7 @@ class DashboardScreen extends StatelessWidget {
               const Text('ยอดออม 7 วันล่าสุด',
                   style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
-              SizedBox(height: 160, child: _Chart(app: app)),
+              SizedBox(height: 160, child: _Chart(totals: money.sevenDays)),
             ],
           ),
         ),
@@ -224,14 +247,12 @@ class DashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style:
-                      const TextStyle(fontSize: 12, color: AppColors.mutedText)),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.mutedText)),
               const SizedBox(height: 4),
               Text(value,
                   style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: color)),
+                      fontSize: 18, fontWeight: FontWeight.bold, color: color)),
             ],
           ),
         ),
@@ -250,24 +271,11 @@ class DashboardScreen extends StatelessWidget {
 }
 
 class _Chart extends StatelessWidget {
-  final AppState app;
-  const _Chart({required this.app});
+  final List<DailySavingTotal> totals;
+  const _Chart({required this.totals});
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final days = List.generate(7, (i) => DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: 6 - i)));
-    final totals = days.map((d) {
-      return app.transactions
-          .where((t) =>
-              t.type != TxType.withdraw &&
-              t.date.year == d.year &&
-              t.date.month == d.month &&
-              t.date.day == d.day)
-          .fold(0.0, (s, t) => s + t.amount);
-    }).toList();
-
     return LineChart(
       LineChartData(
         gridData: const FlGridData(show: true, drawVerticalLine: false),
@@ -282,7 +290,7 @@ class _Chart extends StatelessWidget {
           LineChartBarData(
             spots: [
               for (var i = 0; i < totals.length; i++)
-                FlSpot(i.toDouble(), totals[i]),
+                FlSpot(i.toDouble(), totals[i].totalSatang.toDouble()),
             ],
             isCurved: true,
             color: AppColors.deepGreen,
@@ -290,7 +298,7 @@ class _Chart extends StatelessWidget {
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: AppColors.mint.withOpacity(0.2),
+              color: AppColors.mint.withValues(alpha: 0.2),
             ),
           ),
         ],

@@ -25,8 +25,7 @@ class QuestsScreen extends StatelessWidget {
             const Text('ทำภารกิจเพื่อรับ EXP',
                 style: TextStyle(color: AppColors.mutedText)),
             const SizedBox(height: 16),
-            const Text('รายวัน',
-                style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text('รายวัน', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             ...daily.map((q) => _QuestTile(quest: q)),
             const SizedBox(height: 16),
@@ -79,7 +78,8 @@ class _QuestTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text('${quest.progress}/${quest.target} · +${quest.expReward} EXP',
+                Text(
+                    '${quest.progress}/${quest.target} · +${quest.expReward} EXP',
                     style: const TextStyle(
                         fontSize: 11, color: AppColors.mutedText)),
               ],
@@ -89,14 +89,12 @@ class _QuestTile extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: quest.claimed
-                  ? AppColors.mint.withOpacity(0.15)
+                  ? AppColors.mint.withValues(alpha: 0.15)
                   : quest.complete
                       ? AppColors.mint
                       : Colors.black12,
-              foregroundColor:
-                  quest.claimed ? AppColors.mint : Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              foregroundColor: quest.claimed ? AppColors.mint : Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
             onPressed: (!quest.complete || quest.claimed)
                 ? null

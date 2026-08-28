@@ -1,5 +1,41 @@
 // Data models — ตรงกับเวอร์ชันเว็บ (lib/types.ts)
 
+final DateTime _jsonEpoch = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
+String _stringValue(Object? value, String fallback) =>
+    value == null ? fallback : value.toString();
+
+double _doubleValue(Object? value, [double fallback = 0]) =>
+    value is num ? value.toDouble() : fallback;
+
+int _intValue(Object? value, [int fallback = 0]) {
+  if (value == null) return fallback;
+  if (value is int) return value;
+  throw const FormatException('ค่าจำนวนเต็มใน JSON ไม่ถูกต้อง');
+}
+
+bool _boolValue(Object? value, bool fallback) =>
+    value is bool ? value : fallback;
+
+DateTime _dateValue(Object? value, [DateTime? fallback]) {
+  if (value is DateTime) return value;
+  return DateTime.tryParse(value?.toString() ?? '') ?? fallback ?? _jsonEpoch;
+}
+
+DateTime? _nullableDateValue(Object? value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  return DateTime.tryParse(value.toString());
+}
+
+T _enumValue<T extends Enum>(List<T> values, Object? value, T fallback) {
+  final name = value?.toString();
+  for (final candidate in values) {
+    if (candidate.name == name) return candidate;
+  }
+  return fallback;
+}
+
 enum GoalCategory { shopping, education, travel, emergency, investment, other }
 
 enum GoalPriority { low, medium, high }
@@ -8,7 +44,33 @@ enum GoalStatus { active, completed }
 
 enum SaverMode { child, adult }
 
-enum TxType { deposit, unallocated, withdraw, transfer, adjust, slip }
+enum TxType {
+  deposit,
+  unallocated,
+  withdraw,
+  transfer,
+  allocate,
+  deallocate,
+  adjust,
+  slip,
+}
+
+enum TransactionFlow { externalIn, externalOut, internal, adjustment }
+
+const Map<TxType, TransactionFlow> transactionFlowByType =
+    <TxType, TransactionFlow>{
+  TxType.deposit: TransactionFlow.externalIn,
+  TxType.unallocated: TransactionFlow.externalIn,
+  TxType.withdraw: TransactionFlow.externalOut,
+  TxType.transfer: TransactionFlow.internal,
+  TxType.allocate: TransactionFlow.internal,
+  TxType.deallocate: TransactionFlow.internal,
+  TxType.adjust: TransactionFlow.adjustment,
+  TxType.slip: TransactionFlow.externalIn,
+};
+
+TransactionFlow transactionFlowForType(TxType type) =>
+    transactionFlowByType[type]!;
 
 // รายรับ-รายจ่าย (แยกจากการออม)
 enum LedgerType { income, expense }
@@ -16,7 +78,7 @@ enum LedgerType { income, expense }
 class LedgerEntry {
   String id;
   LedgerType type;
-  double amount;
+  int amountSatang;
   String category;
   String note;
   DateTime date;
@@ -24,7 +86,7 @@ class LedgerEntry {
   LedgerEntry({
     required this.id,
     required this.type,
-    required this.amount,
+    required this.amountSatang,
     required this.category,
     this.note = '',
     required this.date,
@@ -33,19 +95,23 @@ class LedgerEntry {
   Map<String, dynamic> toJson() => {
         'id': id,
         'type': type.name,
-        'amount': amount,
+        'amountSatang': amountSatang,
         'category': category,
         'note': note,
         'date': date.toIso8601String(),
       };
 
   factory LedgerEntry.fromJson(Map<String, dynamic> j) => LedgerEntry(
-        id: j['id'],
-        type: LedgerType.values.byName(j['type']),
-        amount: (j['amount'] as num).toDouble(),
-        category: j['category'] ?? 'อื่น ๆ',
-        note: j['note'] ?? '',
-        date: DateTime.parse(j['date']),
+        id: _stringValue(j['id'], ''),
+        type: _enumValue(
+          LedgerType.values,
+          j['type'],
+          LedgerType.expense,
+        ),
+        amountSatang: _intValue(j['amountSatang']),
+        category: _stringValue(j['category'], 'อื่น ๆ'),
+        note: _stringValue(j['note'], ''),
+        date: _dateValue(j['date']),
       );
 }
 
@@ -53,8 +119,8 @@ class Goal {
   String id;
   String name;
   String description;
-  double targetAmount;
-  double currentAmount;
+  int targetSatang;
+  int currentSatang;
   DateTime startDate;
   DateTime targetDate;
   GoalCategory category;
@@ -68,13 +134,14 @@ class Goal {
   DateTime? lockUntil;
   bool shared; // ออมด้วยกัน
   List<String> members;
+  int highestMilestonePercent;
 
   Goal({
     required this.id,
     required this.name,
     this.description = '',
-    required this.targetAmount,
-    this.currentAmount = 0,
+    required this.targetSatang,
+    this.currentSatang = 0,
     required this.startDate,
     required this.targetDate,
     this.category = GoalCategory.other,
@@ -88,11 +155,25 @@ class Goal {
     this.lockUntil,
     this.shared = false,
     List<String>? members,
-  }) : members = members ?? [];
+    this.highestMilestonePercent = 0,
+  }) : members = members ?? [] {
+    if (flexible) {
+      status = GoalStatus.active;
+      completedDate = null;
+    }
+  }
 
+  bool get hasSavingsTarget => !flexible && targetSatang > 0;
+  bool get isCompleted => hasSavingsTarget && status == GoalStatus.completed;
   double get progress =>
-      targetAmount <= 0 ? 0 : (currentAmount / targetAmount).clamp(0, 1);
-  double get remaining => (targetAmount - currentAmount).clamp(0, double.infinity);
+      hasSavingsTarget ? (currentSatang / targetSatang).clamp(0, 1) : 0;
+  int get remainingSatang {
+    if (!hasSavingsTarget) return 0;
+    final remaining = targetSatang - currentSatang;
+    if (remaining <= 0) return 0;
+    return remaining > targetSatang ? targetSatang : remaining;
+  }
+
   bool get isLockedNow =>
       locked && (lockUntil == null || lockUntil!.isAfter(DateTime.now()));
 
@@ -100,8 +181,8 @@ class Goal {
         'id': id,
         'name': name,
         'description': description,
-        'targetAmount': targetAmount,
-        'currentAmount': currentAmount,
+        'targetSatang': targetSatang,
+        'currentSatang': currentSatang,
         'startDate': startDate.toIso8601String(),
         'targetDate': targetDate.toIso8601String(),
         'category': category.name,
@@ -115,39 +196,55 @@ class Goal {
         'lockUntil': lockUntil?.toIso8601String(),
         'shared': shared,
         'members': members,
+        'highestMilestonePercent': highestMilestonePercent,
       };
 
   factory Goal.fromJson(Map<String, dynamic> j) => Goal(
-        id: j['id'],
-        name: j['name'],
-        description: j['description'] ?? '',
-        targetAmount: (j['targetAmount'] as num).toDouble(),
-        currentAmount: (j['currentAmount'] as num).toDouble(),
-        startDate: DateTime.parse(j['startDate']),
-        targetDate: DateTime.parse(j['targetDate']),
-        category: GoalCategory.values.byName(j['category']),
-        priority: GoalPriority.values.byName(j['priority']),
-        emoji: j['emoji'] ?? '🎯',
-        themeColor: j['themeColor'] ?? 0xFF52C7A5,
-        status: GoalStatus.values.byName(j['status']),
-        completedDate: j['completedDate'] != null
-            ? DateTime.parse(j['completedDate'])
-            : null,
-        flexible: j['flexible'] ?? false,
-        locked: j['locked'] ?? false,
-        lockUntil:
-            j['lockUntil'] != null ? DateTime.parse(j['lockUntil']) : null,
-        shared: j['shared'] ?? false,
-        members: (j['members'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        id: _stringValue(j['id'], ''),
+        name: _stringValue(j['name'], ''),
+        description: _stringValue(j['description'], ''),
+        targetSatang: _intValue(j['targetSatang']),
+        currentSatang: _intValue(j['currentSatang']),
+        startDate: _dateValue(j['startDate']),
+        targetDate: _dateValue(j['targetDate']),
+        category: _enumValue(
+          GoalCategory.values,
+          j['category'],
+          GoalCategory.other,
+        ),
+        priority: _enumValue(
+          GoalPriority.values,
+          j['priority'],
+          GoalPriority.medium,
+        ),
+        emoji: _stringValue(j['emoji'], '🎯'),
+        themeColor: _intValue(j['themeColor'], 0xFF52C7A5),
+        status: _enumValue(
+          GoalStatus.values,
+          j['status'],
+          GoalStatus.active,
+        ),
+        completedDate: _nullableDateValue(j['completedDate']),
+        flexible: _boolValue(j['flexible'], false),
+        locked: _boolValue(j['locked'], false),
+        lockUntil: _nullableDateValue(j['lockUntil']),
+        shared: _boolValue(j['shared'], false),
+        members:
+            (j['members'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        highestMilestonePercent: _intValue(j['highestMilestonePercent']),
       );
 }
 
 class SavingTransaction {
   String id;
   TxType type;
-  double amount;
+  TransactionFlow flow;
+  int amountSatang;
   DateTime date;
   String? goalId;
+  String? destinationGoalId;
+  String? sourceGoalNameSnapshot;
+  String? destinationGoalNameSnapshot;
   String note;
   int expAwarded;
   bool isPossibleDuplicate;
@@ -155,36 +252,63 @@ class SavingTransaction {
   SavingTransaction({
     required this.id,
     required this.type,
-    required this.amount,
+    TransactionFlow? flow,
+    required this.amountSatang,
     required this.date,
     this.goalId,
+    this.destinationGoalId,
+    this.sourceGoalNameSnapshot,
+    this.destinationGoalNameSnapshot,
     this.note = '',
     this.expAwarded = 0,
     this.isPossibleDuplicate = false,
-  });
+  }) : flow = flow ?? transactionFlowForType(type) {
+    final expectedFlow = transactionFlowForType(type);
+    if (this.flow != expectedFlow) {
+      throw ArgumentError.value(
+        this.flow,
+        'flow',
+        'TxType.${type.name} ต้องใช้ flow ${expectedFlow.name}',
+      );
+    }
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'type': type.name,
-        'amount': amount,
+        'flow': flow.name,
+        'amountSatang': amountSatang,
         'date': date.toIso8601String(),
         'goalId': goalId,
+        'destinationGoalId': destinationGoalId,
+        'sourceGoalNameSnapshot': sourceGoalNameSnapshot,
+        'destinationGoalNameSnapshot': destinationGoalNameSnapshot,
         'note': note,
         'expAwarded': expAwarded,
         'isPossibleDuplicate': isPossibleDuplicate,
       };
 
-  factory SavingTransaction.fromJson(Map<String, dynamic> j) =>
-      SavingTransaction(
-        id: j['id'],
-        type: TxType.values.byName(j['type']),
-        amount: (j['amount'] as num).toDouble(),
-        date: DateTime.parse(j['date']),
-        goalId: j['goalId'],
-        note: j['note'] ?? '',
-        expAwarded: j['expAwarded'] ?? 0,
-        isPossibleDuplicate: j['isPossibleDuplicate'] ?? false,
-      );
+  factory SavingTransaction.fromJson(Map<String, dynamic> j) {
+    final type = _enumValue(TxType.values, j['type'], TxType.deposit);
+    return SavingTransaction(
+      id: _stringValue(j['id'], ''),
+      type: type,
+      flow: _enumValue(
+        TransactionFlow.values,
+        j['flow'],
+        transactionFlowForType(type),
+      ),
+      amountSatang: _intValue(j['amountSatang']),
+      date: _dateValue(j['date']),
+      goalId: j['goalId']?.toString(),
+      destinationGoalId: j['destinationGoalId']?.toString(),
+      sourceGoalNameSnapshot: j['sourceGoalNameSnapshot']?.toString(),
+      destinationGoalNameSnapshot: j['destinationGoalNameSnapshot']?.toString(),
+      note: _stringValue(j['note'], ''),
+      expAwarded: _intValue(j['expAwarded']),
+      isPossibleDuplicate: _boolValue(j['isPossibleDuplicate'], false),
+    );
+  }
 }
 
 class Quest {
@@ -222,14 +346,14 @@ class Quest {
       };
 
   factory Quest.fromJson(Map<String, dynamic> j) => Quest(
-        id: j['id'],
-        title: j['title'],
-        description: j['description'],
-        period: j['period'],
-        target: j['target'],
-        progress: j['progress'] ?? 0,
-        expReward: j['expReward'],
-        claimed: j['claimed'] ?? false,
+        id: _stringValue(j['id'], ''),
+        title: _stringValue(j['title'], ''),
+        description: _stringValue(j['description'], ''),
+        period: _stringValue(j['period'], 'daily'),
+        target: _intValue(j['target'], 1),
+        progress: _intValue(j['progress']),
+        expReward: _intValue(j['expReward']),
+        claimed: _boolValue(j['claimed'], false),
       );
 }
 
@@ -263,13 +387,13 @@ class AchievementBadge {
       };
 
   factory AchievementBadge.fromJson(Map<String, dynamic> j) => AchievementBadge(
-        id: j['id'],
-        name: j['name'],
-        description: j['description'],
-        emoji: j['emoji'],
-        condition: j['condition'],
-        unlocked: j['unlocked'] ?? false,
-        progress: (j['progress'] as num?)?.toDouble() ?? 0,
+        id: _stringValue(j['id'], ''),
+        name: _stringValue(j['name'], ''),
+        description: _stringValue(j['description'], ''),
+        emoji: _stringValue(j['emoji'], '🏅'),
+        condition: _stringValue(j['condition'], ''),
+        unlocked: _boolValue(j['unlocked'], false),
+        progress: _doubleValue(j['progress']),
       );
 }
 
@@ -300,11 +424,14 @@ class AppUser {
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
-        name: j['name'] ?? 'กัปตัน',
-        emoji: j['emoji'] ?? '🧑‍✈️',
-        exp: j['exp'] ?? 0,
-        consistencyWeeks: j['consistencyWeeks'] ?? 0,
-        mode: SaverMode.values.byName(j['mode'] ?? 'adult'),
-        onboarded: j['onboarded'] ?? true, // ผู้ใช้เก่าถือว่าผ่านแล้ว
+        name: _stringValue(j['name'], 'กัปตัน'),
+        emoji: _stringValue(j['emoji'], '🧑‍✈️'),
+        exp: _intValue(j['exp']),
+        consistencyWeeks: _intValue(j['consistencyWeeks']),
+        mode: _enumValue(SaverMode.values, j['mode'], SaverMode.adult),
+        onboarded: _boolValue(
+          j['onboarded'],
+          true, // ผู้ใช้เก่าถือว่าผ่านแล้ว
+        ),
       );
 }

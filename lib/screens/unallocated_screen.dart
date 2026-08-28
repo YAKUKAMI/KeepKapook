@@ -26,8 +26,8 @@ class UnallocatedScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(colors: [
-                AppColors.warmYellow.withOpacity(0.25),
-                AppColors.coral.withOpacity(0.15),
+                AppColors.warmYellow.withValues(alpha: 0.25),
+                AppColors.coral.withValues(alpha: 0.15),
               ]),
               borderRadius: BorderRadius.circular(20),
             ),
@@ -36,20 +36,19 @@ class UnallocatedScreen extends StatelessWidget {
               children: [
                 const Text('ยอดรวมที่ยังไม่จัดสรร',
                     style: TextStyle(color: AppColors.mutedText)),
-                Text(formatMoney(app.unallocated),
+                Text(formatMoney(app.unallocatedSatang),
                     style: const TextStyle(
                         fontSize: 28, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 const Text(
                     'เป็นข้อมูลที่คุณบันทึกไว้ ไม่ใช่เงินจริงที่ KeepKapook ถือครอง',
-                    style: TextStyle(
-                        fontSize: 11, color: AppColors.mutedText)),
+                    style: TextStyle(fontSize: 11, color: AppColors.mutedText)),
               ],
             ),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: app.unallocated <= 0
+            onPressed: app.unallocatedSatang <= 0
                 ? null
                 : () => _allocateDialog(context, app),
             icon: const Icon(Icons.swap_horiz),
@@ -61,50 +60,58 @@ class UnallocatedScreen extends StatelessWidget {
   }
 
   void _allocateDialog(BuildContext context, AppState app) {
-    String? goalId = app.activeGoals.isNotEmpty ? app.activeGoals.first.id : null;
-    final ctrl = TextEditingController(text: app.unallocated.toStringAsFixed(0));
+    String? goalId =
+        app.activeGoals.isNotEmpty ? app.activeGoals.first.id : null;
+    final ctrl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          backgroundColor: AppColors.white,
-          title: const Text('จัดสรรเงิน'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButton<String>(
-                isExpanded: true,
-                value: goalId,
-                items: app.activeGoals
-                    .map((g) => DropdownMenuItem(
-                        value: g.id, child: Text('${g.emoji} ${g.name}')))
-                    .toList(),
-                onChanged: (v) => setLocal(() => goalId = v),
-              ),
-              TextField(
-                controller: ctrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(prefixText: '฿ '),
+        builder: (ctx, setLocal) {
+          final amountSatang = parseMoneyToSatang(ctrl.text);
+          final inputError =
+              ctrl.text.trim().isEmpty ? null : moneyInputError(ctrl.text);
+          return AlertDialog(
+            backgroundColor: AppColors.white,
+            title: const Text('จัดสรรเงิน'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButton<String>(
+                  isExpanded: true,
+                  value: goalId,
+                  items: app.activeGoals
+                      .map((g) => DropdownMenuItem(
+                          value: g.id, child: Text('${g.emoji} ${g.name}')))
+                      .toList(),
+                  onChanged: (v) => setLocal(() => goalId = v),
+                ),
+                TextField(
+                  controller: ctrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setLocal(() {}),
+                  decoration:
+                      InputDecoration(prefixText: '฿ ', errorText: inputError),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('ยกเลิก')),
+              FilledButton(
+                onPressed:
+                    goalId == null || amountSatang == null || amountSatang <= 0
+                        ? null
+                        : () {
+                            app.allocateUnallocated(amountSatang, goalId!);
+                            Navigator.pop(ctx);
+                          },
+                child: const Text('จัดสรร'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('ยกเลิก')),
-            FilledButton(
-              onPressed: () {
-                final amt = double.tryParse(ctrl.text.replaceAll(',', '')) ?? 0;
-                if (goalId != null && amt > 0) {
-                  app.allocateUnallocated(amt, goalId!);
-                }
-                Navigator.pop(ctx);
-              },
-              child: const Text('จัดสรร'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

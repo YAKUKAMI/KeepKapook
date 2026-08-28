@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 
 class GoalCard extends StatelessWidget {
@@ -11,7 +12,8 @@ class GoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Color(goal.themeColor);
-    final done = goal.status == GoalStatus.completed;
+    final money = summarizeGoalMoney(goal);
+    final done = money.isCompleted;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -21,7 +23,11 @@ class GoalCard extends StatelessWidget {
           color: AppColors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: kCardShadow,
-          border: done ? Border.all(color: AppColors.mint.withOpacity(0.4)) : null,
+          border: done
+              ? Border.all(
+                  color: AppColors.mint.withValues(alpha: 0.4),
+                )
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,7 +39,7 @@ class GoalCard extends StatelessWidget {
                   height: 48,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.13),
+                    color: color.withValues(alpha: 0.13),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(goal.emoji, style: const TextStyle(fontSize: 24)),
@@ -49,53 +55,82 @@ class GoalCard extends StatelessWidget {
                           style: const TextStyle(fontWeight: FontWeight.w600)),
                       if (done)
                         const Text('สำเร็จแล้ว 🎉',
-                            style: TextStyle(fontSize: 12, color: AppColors.mint)),
+                            style:
+                                TextStyle(fontSize: 12, color: AppColors.mint)),
                     ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(formatMoney(goal.currentAmount),
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(width: 6),
-                Text('/ ${formatMoney(goal.targetAmount)}',
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.mutedText)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: goal.progress,
-                minHeight: 8,
-                backgroundColor: Colors.black12,
-                valueColor: AlwaysStoppedAnimation(color),
+            if (goal.flexible) ...[
+              const Text(
+                'ยอดสะสม',
+                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('${(goal.progress * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: color,
-                        fontWeight: FontWeight.w600)),
-                Text(
-                  done
-                      ? 'เสร็จสิ้น'
-                      : 'เหลือ ${formatMoney(goal.remaining)} · ${daysLeft(goal.targetDate)} วัน',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.mutedText),
+              const SizedBox(height: 4),
+              Text(
+                formatMoney(money.currentSatang),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
-            ),
+              ),
+            ] else ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    formatMoney(money.currentSatang),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '/ ${formatMoney(money.targetSatang)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.mutedText,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: money.progress,
+                  minHeight: 8,
+                  backgroundColor: Colors.black12,
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${(money.progress * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    done
+                        ? 'เสร็จสิ้น'
+                        : 'เหลือ ${formatMoney(money.remainingSatang)} · ${daysLeft(goal.targetDate)} วัน',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.mutedText,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

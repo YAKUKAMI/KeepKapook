@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import '../utils/format.dart';
 
 class NewGoalScreen extends StatefulWidget {
   const NewGoalScreen({super.key});
@@ -15,7 +16,7 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
   final _target = TextEditingController();
   DateTime _date = DateTime.now().add(const Duration(days: 90));
   String _emoji = '🎯';
-  GoalCategory _cat = GoalCategory.other;
+  final GoalCategory _cat = GoalCategory.other;
   bool _pocket = false; // Cloud Pocket ยืดหยุ่น (ไม่มีเป้าหมาย)
 
   static const _emojis = ['🎯', '✈️', '💻', '🏠', '🚗', '🎓', '🎁', '🛟'];
@@ -50,7 +51,7 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
             child: SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _pocket,
-              activeColor: AppColors.mint,
+              activeThumbColor: AppColors.mint,
               title: const Text('กระเป๋าใช้จ่าย (ไม่มีเป้าหมาย)'),
               subtitle: const Text('ยืดหยุ่น เข้า-ออกได้ตลอด',
                   style: TextStyle(fontSize: 12)),
@@ -86,8 +87,7 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child:
-                    Text('${_date.day}/${_date.month}/${_date.year + 543}'),
+                child: Text('${_date.day}/${_date.month}/${_date.year + 543}'),
               ),
             ),
             const SizedBox(height: 12),
@@ -106,7 +106,7 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: active
-                        ? AppColors.mint.withOpacity(0.2)
+                        ? AppColors.mint.withValues(alpha: 0.2)
                         : AppColors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: active
@@ -122,8 +122,8 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
           FilledButton(
             onPressed: () {
               if (_name.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('กรุณากรอกชื่อ')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('กรุณากรอกชื่อ')));
                 return;
               }
               if (_pocket) {
@@ -131,16 +131,16 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
                 Navigator.pop(context);
                 return;
               }
-              final target =
-                  double.tryParse(_target.text.replaceAll(',', '')) ?? 0;
-              if (target <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('กรุณากรอกจำนวนเงินเป้าหมาย')));
+              final targetSatang = parseMoneyToSatang(_target.text);
+              if (targetSatang == null || targetSatang <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(moneyInputError(_target.text) ??
+                        'กรุณากรอกจำนวนเงินเป้าหมาย')));
                 return;
               }
               app.addGoal(
                 name: _name.text.trim(),
-                target: target,
+                targetSatang: targetSatang,
                 targetDate: _date,
                 emoji: _emoji,
                 category: _cat,
@@ -163,12 +163,16 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
         const SizedBox(height: 6),
         TextField(
           controller: c,
+          onChanged: number ? (_) => setState(() {}) : null,
           keyboardType: number
               ? const TextInputType.numberWithOptions(decimal: true)
               : TextInputType.text,
           decoration: InputDecoration(
             hintText: hint,
             prefixText: prefix,
+            errorText: number && c.text.trim().isNotEmpty
+                ? moneyInputError(c.text)
+                : null,
             filled: true,
             fillColor: AppColors.white,
             border: OutlineInputBorder(

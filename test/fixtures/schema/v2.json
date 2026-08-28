@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 2,
+  "user": {
+    "name": "ผู้ใช้ v2",
+    "emoji": "🐷",
+    "exp": 240,
+    "consistencyWeeks": 3,
+    "mode": "adult",
+    "onboarded": true
+  },
+  "goals": [
+    {
+      "id": "v2-source",
+      "name": "เงินฉุกเฉิน",
+      "targetSatang": 100000,
+      "currentSatang": 40000,
+      "startDate": "2025-01-01T00:00:00.000Z",
+      "targetDate": "2026-01-01T00:00:00.000Z",
+      "category": "emergency",
+      "priority": "high",
+      "emoji": "🛟"
+    },
+    {
+      "id": "v2-destination",
+      "name": "ท่องเที่ยว",
+      "targetSatang": 200000,
+      "currentSatang": 10000,
+      "startDate": "2025-01-01T00:00:00.000Z",
+      "targetDate": "2026-06-01T00:00:00.000Z",
+      "category": "travel",
+      "priority": "medium",
+      "emoji": "✈️"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "v2-transfer",
+      "type": "transfer",
+      "amountSatang": 5000,
+      "date": "2025-03-01T00:00:00.000Z",
+      "goalId": "v2-source",
+      "note": "โอนไป ท่องเที่ยว",
+      "expAwarded": 0,
+      "isPossibleDuplicate": false
+    }
+  ],
+  "quests": [
+    {
+      "id": "q-allocate",
+      "title": "จัดสรรเงิน",
+      "description": "จัดสรรเงินที่ยังไม่เลือกเป้าหมาย",
+      "period": "daily",
+      "target": 1,
+      "progress": 1,
+      "expReward": 15,
+      "claimed": false
+    }
+  ],
+  "badges": [
+    {
+      "id": "b-halfway",
+      "name": "Halfway Hero",
+      "description": "กระปุกถึง 50%",
+      "emoji": "⛰️",
+      "condition": "กระปุกใดถึง 50%",
+      "unlocked": true,
+      "progress": 1.0
+    }
+  ],
+  "ledger": [],
+  "unallocatedSatang": 5000
+}

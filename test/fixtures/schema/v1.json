@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "user": {
+    "name": "ผู้ใช้ v1",
+    "emoji": "🐷",
+    "exp": 125,
+    "consistencyWeeks": 2,
+    "mode": "adult",
+    "onboarded": true
+  },
+  "goals": [
+    {
+      "id": "v1-goal",
+      "name": "เงินฉุกเฉิน",
+      "description": "ข้อมูลจริงก่อนใช้สตางค์",
+      "targetAmount": 1000.0,
+      "currentAmount": 456.78,
+      "startDate": "2025-01-01T00:00:00.000Z",
+      "targetDate": "2026-01-01T00:00:00.000Z",
+      "category": "emergency",
+      "priority": "high",
+      "emoji": "🛟",
+      "themeColor": 4283615141,
+      "status": "active",
+      "completedDate": null,
+      "flexible": false,
+      "locked": false,
+      "lockUntil": null,
+      "shared": false,
+      "members": []
+    }
+  ],
+  "transactions": [
+    {
+      "id": "v1-transaction",
+      "type": "deposit",
+      "amount": 123.45,
+      "date": "2025-02-01T00:00:00.000Z",
+      "goalId": "v1-goal",
+      "note": "เงินเดือน",
+      "expAwarded": 10,
+      "isPossibleDuplicate": false
+    }
+  ],
+  "quests": [
+    {
+      "id": "q-deposit",
+      "title": "บันทึกเงินออม",
+      "description": "เพิ่มเงินเข้ากระปุกวันนี้",
+      "period": "daily",
+      "target": 1,
+      "progress": 1,
+      "expReward": 15,
+      "claimed": true
+    }
+  ],
+  "badges": [
+    {
+      "id": "b-first-drop",
+      "name": "First Drop",
+      "description": "ออมครั้งแรก",
+      "emoji": "💧",
+      "condition": "บันทึกเงินออมครั้งแรก",
+      "unlocked": true,
+      "progress": 1.0
+    }
+  ],
+  "ledger": [
+    {
+      "id": "v1-ledger",
+      "type": "income",
+      "amount": 50.25,
+      "category": "งานพิเศษ",
+      "note": "รายได้เสริม",
+      "date": "2025-02-01T00:00:00.000Z"
+    }
+  ],
+  "unallocated": 12.34
+}
