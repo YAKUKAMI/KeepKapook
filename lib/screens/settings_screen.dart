@@ -50,8 +50,9 @@ class SettingsScreen extends StatelessWidget {
                       padding: const EdgeInsets.only(right: 8),
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          backgroundColor:
-                              active ? AppColors.mint.withOpacity(0.15) : null,
+                          backgroundColor: active
+                              ? AppColors.mint.withValues(alpha: 0.15)
+                              : null,
                           side: BorderSide(
                               color: active ? AppColors.mint : Colors.black12),
                         ),

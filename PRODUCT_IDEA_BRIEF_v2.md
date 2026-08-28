@@ -576,3 +576,4 @@ W8 retention ≥ 15% · มีผู้ใช้ ≥ 50 คนที่ใช้
 | I11 | quest และ badge ทุกตัวต้องมี handler ที่ทำสำเร็จได้จริง |
 | I12 | undo ต้องคืน TOTAL, EXP, quest และ badge ครบ |
 | I13 | ทุก TxType ต้องมี canonical flow ค่าเดียว และ transaction ทุก action ต้องผ่าน mapping กลาง |
+| I14 | fixture ของทุก schema เก่าต้อง migrate ทั้งโซ่ถึง current schema โดยรักษา TOTAL และข้อมูลสำคัญ |

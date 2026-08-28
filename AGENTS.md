@@ -58,6 +58,7 @@ lib/
                              scan_slip, quests, achievements, history, unallocated,
                              settings, ledger, onboarding
 test/
+├─ fixtures/schema/v1.json ... v4.json  state จริงของทุก schema เก่าสำหรับ I14
 ├─ smoke_test.dart           boot→onboarding + ทุกหน้าจอ build ไม่ crash
 ├─ models_serialization_test.dart
 ├─ migrations_test.dart
@@ -69,6 +70,7 @@ test/
 ├─ financial_summary_test.dart  parity ของ goal/month/7-day pure summaries
 ├─ transaction_flow_test.dart   flow + source/destination + legacy edit guard
 ├─ invariants/transaction_flow_invariant_test.dart  I13 canonical TxType/flow
+├─ invariants/migration_chain_invariant_test.dart  I14 full-chain + TOTAL
 ├─ parser_test.dart          corpus accuracy + parser edge cases
 ├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
 ├─ historical_edit_test.dart       edit/delete history + ledger
@@ -124,6 +126,7 @@ test/
 - ชื่อ key ลงท้าย `_v1` เป็นชื่อ storage key เดิมเพื่อรักษาความเข้ากันได้ ไม่ใช่เลข schema ปัจจุบัน; schema ใน JSON คือ v5
 - **ทุกครั้งที่เพิ่ม/เปลี่ยน/ลบ field ใน model ต้องเพิ่ม `schemaVersion` และเขียน migration**
   ค่า version ปัจจุบันและ migration steps อยู่ใน `lib/state/migrations.dart`
+- ก่อน bump schema จาก vN เป็น vN+1 ต้องเพิ่ม fixture ของ vN ที่ `test/fixtures/schema/vN.json` เสมอ; I14 ต้อง migrate fixture ทุก version ถึง current schema โดยรักษา goal, transaction, EXP, unlocked badge และ TOTAL
 - `fromJson` ทุกตัวต้องทนข้อมูลเก่า: field ที่เพิ่มใหม่ต้องมี default ไม่ใช่ `!`
 - โหลดตอนเปิดแอปต้องอยู่ใน try/catch — parse ไม่ผ่านห้าม crash ให้ fallback + แจ้งผู้ใช้ ไม่ใช่ล้างข้อมูลเงียบๆ
 - `SavingTransaction.flow` แยกทิศทางเงินออกจาก `TxType`: `externalIn`, `externalOut`, `internal`, `adjustment`; `goalId` คือ source และ `destinationGoalId` คือ destination (nullable ทั้งคู่)
@@ -182,7 +185,7 @@ test/
 - **ไม่มีข้อมูล mock** — เริ่มว่างเปล่าผ่าน onboarding, Settings มี "ล้างข้อมูลทั้งหมด"
 - **สำรอง/กู้คืนข้อมูล:** export JSON ออกนอกแอปและ import พร้อม preview/ยืนยัน โดยทำงานบน web และ mobile
 - **Conversational Ledger:** deterministic pure-Dart parser, confidence tier, บันทึกทันทีพร้อม undo, chip แก้ field, คำถามเมื่อกำกวม และแก้/ลบย้อนหลังจาก History/Ledger
-- **ข้อจำกัดที่พบจากโค้ดจริง:** quest มี 4 id แต่เพิ่ม progress เฉพาะ `q-deposit`; badge มี 6 id แต่ recompute เฉพาะ 4 id; `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
+- quest ปัจจุบันมี `q-deposit` และ `q-allocate` พร้อม event handler ทั้งคู่; badge default 4 ตัวมีเงื่อนไขใน `_recomputeBadges()` ครบ ส่วน `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
 
 ---
 
@@ -192,22 +195,28 @@ test/
 flutter pub get
 flutter run -d chrome        # หรือ device/emulator
 
-flutter analyze lib          # ต้อง 0 error
-flutter test                 # ต้องเขียวทั้งหมด
-flutter build web            # verify web compile
-flutter build apk --release  # Android SDK ติดตั้งแล้ว; APK release เคย build ผ่าน
+# คำสั่งบังคับใน CI ทุก PR — ทั้งสามต้องเขียวก่อน merge
+flutter analyze --fatal-infos --fatal-warnings
+flutter test
+flutter build web
+
+# ตรวจ platform release ในเครื่องเมื่อแตะ config/plugin/platform
+flutter build apk --release
 ```
+
+Workflow: `.github/workflows/definition-of-done.yml` ใช้ Flutter 3.47.1 และรันบน `pull_request`; `analysis_options.yaml` เปิด `unawaited_futures` เพื่อจับ Future ที่หลุดจากการรอโดยไม่ตั้งใจ
 
 ### Definition of Done — บังคับทุกงาน
 
 งานถือว่าเสร็จก็ต่อเมื่อครบทุกข้อ ห้ามรายงานว่าเสร็จถ้าข้อใดข้อหนึ่งไม่ผ่าน:
 
-1. `flutter analyze lib` — 0 error (warning ใหม่ก็ไม่รับ)
+1. `flutter analyze --fatal-infos --fatal-warnings` — ต้อง 0 diagnostics ห้ามปิด flag หรือ ignore กว้างทั้งโปรเจกต์
 2. `flutter test` — เขียวทั้งหมด
 3. `flutter build web` — ผ่าน
-4. ถ้าแตะ logic ที่คำนวณตัวเลข (เงิน, EXP, วัน, แผน) → **ต้องมี unit test ใหม่ที่ fail ก่อนแก้และ pass หลังแก้**
-5. ถ้าแตะ model/persist → บอกใน summary ว่า schemaVersion เปลี่ยนเป็นเท่าไรและ migration อยู่ไฟล์ไหน
-6. สรุปท้ายงาน: แก้ไฟล์อะไร / ตัดสินใจอะไรที่ไม่ชัดในโจทย์ / อะไรที่ยังไม่ได้ทำ
+4. PR ต้องมี check `Analyze, test, and build web` เป็นสีเขียวก่อน merge
+5. ถ้าแตะ logic ที่คำนวณตัวเลข (เงิน, EXP, วัน, แผน) → **ต้องมี unit test ใหม่ที่ fail ก่อนแก้และ pass หลังแก้**
+6. ถ้าแตะ model/persist → บอกใน summary ว่า schemaVersion เปลี่ยนเป็นเท่าไรและ migration อยู่ไฟล์ไหน
+7. สรุปท้ายงาน: แก้ไฟล์อะไร / ตัดสินใจอะไรที่ไม่ชัดในโจทย์ / อะไรที่ยังไม่ได้ทำ
 
 ---
 
@@ -308,7 +317,7 @@ void someAction(...) {
 - [ ] **Challenge การออม** — ออม 365 วันทวีคูณ / สัปดาห์ไม่ใช้เงิน / เก็บเศษสตางค์ (ต่อยอด quest+badge ที่มีอยู่)
 - [ ] **สรุปรายสัปดาห์-เดือน แชร์เป็นรูป** — growth loop ที่ไม่ต้องซื้อโฆษณา
 - [x] debounce 300ms + ordered write queue + error reporting ใน `_save()`
-- [ ] CI (GitHub Actions): analyze + test + build web ทุก PR
+- [x] CI (GitHub Actions): fatal analyze + test + build web ทุก PR (`.github/workflows/definition-of-done.yml`)
 - [x] แยก flexible pocket ให้รับเงินไม่จำกัด ไม่มี overflow/progress/milestone/completed
 - [x] แก้กราฟ 7 วันและค่าเฉลี่ยเงินออมให้นับจาก `TransactionFlow.externalIn`
 - [x] `q-allocate` มี handler จาก event จัดสรรจริง และไม่แจก base/milestone EXP ซ้ำ

@@ -56,9 +56,8 @@ class _ScanSlipScreenState extends State<ScanSlipScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final amountSatang = parseMoneyToSatang(_amount.text);
-    final inputError = _amount.text.trim().isEmpty
-        ? null
-        : moneyInputError(_amount.text);
+    final inputError =
+        _amount.text.trim().isEmpty ? null : moneyInputError(_amount.text);
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -74,7 +73,7 @@ class _ScanSlipScreenState extends State<ScanSlipScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.warmYellow.withOpacity(0.15),
+              color: AppColors.warmYellow.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Text(
@@ -149,13 +148,13 @@ class _ScanSlipScreenState extends State<ScanSlipScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text('เข้ากระปุก', style: TextStyle(fontWeight: FontWeight.w500)),
+          const Text('เข้ากระปุก',
+              style: TextStyle(fontWeight: FontWeight.w500)),
           const SizedBox(height: 6),
           _destTile('💼 เงินที่ยังไม่จัดสรร', _dest == 'unallocated',
               () => setState(() => _dest = 'unallocated')),
-          ...app.activeGoals.map((g) => _destTile(
-              '${g.emoji} ${g.name}', _dest == g.id,
-              () => setState(() => _dest = g.id))),
+          ...app.activeGoals.map((g) => _destTile('${g.emoji} ${g.name}',
+              _dest == g.id, () => setState(() => _dest = g.id))),
           const SizedBox(height: 12),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
@@ -170,20 +169,20 @@ class _ScanSlipScreenState extends State<ScanSlipScreen> {
           FilledButton(
             onPressed:
                 (!_confirmed || amountSatang == null || amountSatang <= 0)
-                ? null
-                : () {
-                    final res = app.addSaving(
-                      amountSatang: amountSatang,
-                      goalId: _dest == 'unallocated' ? null : _dest,
-                      note: 'จากสลิป $_bank',
-                      source: TxType.slip,
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(
-                            'บันทึกจากสลิป ${formatMoney(amountSatang)}${res.exp > 0 ? ' · +${res.exp} EXP' : ''}'),
-                        backgroundColor: AppColors.deepGreen));
-                    Navigator.pop(context);
-                  },
+                    ? null
+                    : () {
+                        final res = app.addSaving(
+                          amountSatang: amountSatang,
+                          goalId: _dest == 'unallocated' ? null : _dest,
+                          note: 'จากสลิป $_bank',
+                          source: TxType.slip,
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(
+                                'บันทึกจากสลิป ${formatMoney(amountSatang)}${res.exp > 0 ? ' · +${res.exp} EXP' : ''}'),
+                            backgroundColor: AppColors.deepGreen));
+                        Navigator.pop(context);
+                      },
             child: const Text('บันทึกรายการ'),
           ),
         ],
@@ -199,10 +198,12 @@ class _ScanSlipScreenState extends State<ScanSlipScreen> {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: active ? AppColors.mint.withOpacity(0.1) : AppColors.white,
+              color: active
+                  ? AppColors.mint.withValues(alpha: 0.1)
+                  : AppColors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                  color: active ? AppColors.mint : Colors.black12),
+              border:
+                  Border.all(color: active ? AppColors.mint : Colors.black12),
             ),
             child: Text(label),
           ),

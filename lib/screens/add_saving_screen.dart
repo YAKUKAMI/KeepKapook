@@ -64,8 +64,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
           const SizedBox(height: 6),
           TextField(
             controller: _amountCtrl,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               prefixText: '฿ ',
@@ -84,7 +83,8 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
           const SizedBox(height: 6),
           if (lockedGoal != null)
             _destTile('${lockedGoal.emoji} ${lockedGoal.name}', true,
-                trailing: const Icon(Icons.lock, size: 16, color: AppColors.mint))
+                trailing:
+                    const Icon(Icons.lock, size: 16, color: AppColors.mint))
           else ...[
             _destTile('💼 เงินที่ยังไม่จัดสรร', _dest == 'unallocated',
                 onTap: () => setState(() => _dest = 'unallocated')),
@@ -131,10 +131,11 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: active ? AppColors.mint.withOpacity(0.1) : AppColors.white,
+            color: active
+                ? AppColors.mint.withValues(alpha: 0.1)
+                : AppColors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-                color: active ? AppColors.mint : Colors.black12),
+            border: Border.all(color: active ? AppColors.mint : Colors.black12),
           ),
           child: Row(
             children: [

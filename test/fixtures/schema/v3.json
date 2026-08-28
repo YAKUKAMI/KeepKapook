@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 3,
+  "user": {
+    "name": "ผู้ใช้ v3",
+    "emoji": "🐷",
+    "exp": 360,
+    "consistencyWeeks": 4,
+    "mode": "adult",
+    "onboarded": true
+  },
+  "goals": [
+    {
+      "id": "v3-goal",
+      "name": "คอมพิวเตอร์",
+      "targetSatang": 100000,
+      "currentSatang": 25000,
+      "startDate": "2025-01-01T00:00:00.000Z",
+      "targetDate": "2026-01-01T00:00:00.000Z",
+      "category": "shopping",
+      "priority": "medium",
+      "emoji": "💻"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "v3-legacy-allocate",
+      "type": "deposit",
+      "flow": "internal",
+      "amountSatang": 5000,
+      "date": "2025-04-01T00:00:00.000Z",
+      "goalId": null,
+      "destinationGoalId": "v3-goal",
+      "note": "",
+      "expAwarded": 10,
+      "isPossibleDuplicate": false
+    }
+  ],
+  "quests": [
+    {
+      "id": "q-deposit",
+      "title": "บันทึกเงินออม",
+      "description": "เพิ่มเงินเข้ากระปุกวันนี้",
+      "period": "daily",
+      "target": 1,
+      "progress": 1,
+      "expReward": 15,
+      "claimed": true
+    }
+  ],
+  "badges": [
+    {
+      "id": "b-rhythm",
+      "name": "7-Day Rhythm",
+      "description": "ทำตามแผน 7 ครั้ง",
+      "emoji": "🎵",
+      "condition": "ออมตามแผน 7 ครั้ง",
+      "unlocked": true,
+      "progress": 1.0
+    }
+  ],
+  "ledger": [],
+  "unallocatedSatang": 2500
+}

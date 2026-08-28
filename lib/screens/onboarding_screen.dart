@@ -165,8 +165,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   padding: const EdgeInsets.only(right: 8),
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      backgroundColor:
-                          active ? AppColors.mint.withOpacity(0.15) : null,
+                      backgroundColor: active
+                          ? AppColors.mint.withValues(alpha: 0.15)
+                          : null,
                       side: BorderSide(
                           color: active ? AppColors.mint : Colors.black12),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -240,7 +241,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: active
-                        ? AppColors.mint.withOpacity(0.2)
+                        ? AppColors.mint.withValues(alpha: 0.2)
                         : AppColors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: active

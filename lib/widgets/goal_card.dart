@@ -23,8 +23,11 @@ class GoalCard extends StatelessWidget {
           color: AppColors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: kCardShadow,
-          border:
-              done ? Border.all(color: AppColors.mint.withOpacity(0.4)) : null,
+          border: done
+              ? Border.all(
+                  color: AppColors.mint.withValues(alpha: 0.4),
+                )
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,7 +39,7 @@ class GoalCard extends StatelessWidget {
                   height: 48,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.13),
+                    color: color.withValues(alpha: 0.13),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(goal.emoji, style: const TextStyle(fontSize: 24)),

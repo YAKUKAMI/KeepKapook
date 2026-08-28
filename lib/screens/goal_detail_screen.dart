@@ -223,7 +223,7 @@ class GoalDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.warmYellow.withOpacity(0.12),
+        color: AppColors.warmYellow.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.warmYellow),
       ),
@@ -275,7 +275,7 @@ class GoalDetailScreen extends StatelessWidget {
   Widget _chip(String text, Color color) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(text,

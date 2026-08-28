@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 4,
+  "user": {
+    "name": "ผู้ใช้ v4",
+    "emoji": "🐷",
+    "exp": 480,
+    "consistencyWeeks": 5,
+    "mode": "adult",
+    "onboarded": true
+  },
+  "goals": [
+    {
+      "id": "v4-source",
+      "name": "เงินสำรอง",
+      "targetSatang": 100000,
+      "currentSatang": 30000,
+      "startDate": "2025-01-01T00:00:00.000Z",
+      "targetDate": "2026-01-01T00:00:00.000Z",
+      "category": "emergency",
+      "priority": "high",
+      "emoji": "🛟",
+      "highestMilestonePercent": 25
+    },
+    {
+      "id": "v4-destination",
+      "name": "การศึกษา",
+      "targetSatang": 200000,
+      "currentSatang": 5000,
+      "startDate": "2025-01-01T00:00:00.000Z",
+      "targetDate": "2026-06-01T00:00:00.000Z",
+      "category": "education",
+      "priority": "medium",
+      "emoji": "📚",
+      "highestMilestonePercent": 0
+    }
+  ],
+  "transactions": [
+    {
+      "id": "v4-transfer",
+      "type": "transfer",
+      "flow": "internal",
+      "amountSatang": 5000,
+      "date": "2025-05-01T00:00:00.000Z",
+      "goalId": "v4-source",
+      "destinationGoalId": "v4-destination",
+      "note": "",
+      "expAwarded": 0,
+      "isPossibleDuplicate": false
+    }
+  ],
+  "quests": [
+    {
+      "id": "q-weekly-review",
+      "title": "ทบทวนเป้าหมาย",
+      "description": "เปิดดูกระปุก 3 ครั้งสัปดาห์นี้",
+      "period": "weekly",
+      "target": 3,
+      "progress": 2,
+      "expReward": 40,
+      "claimed": false
+    }
+  ],
+  "badges": [
+    {
+      "id": "b-memory",
+      "name": "Memory Maker",
+      "description": "เพิ่มรูป 10 รูป",
+      "emoji": "📸",
+      "condition": "เพิ่มรูปใน Album 10 รูป",
+      "unlocked": true,
+      "progress": 1.0
+    }
+  ],
+  "ledger": [],
+  "unallocatedSatang": 10000
+}
