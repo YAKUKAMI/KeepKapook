@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'services/quick_entry/quick_entry_controller.dart';
 import 'services/notifications/notification_controller.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
@@ -12,7 +13,7 @@ import 'screens/history_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'utils/notification_schedule.dart';
-import 'widgets/conversational_entry_sheet.dart';
+import 'widgets/quick_record_sheet.dart';
 
 void main() {
   runApp(
@@ -21,6 +22,9 @@ void main() {
         ChangeNotifierProvider(create: (_) => AppState()..load()),
         ChangeNotifierProvider(
           create: (_) => NotificationController()..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => QuickEntryController()..load(),
         ),
       ],
       child: const KeepKapookApp(),
@@ -81,9 +85,9 @@ class _HomeShellState extends State<HomeShell> {
         body: SafeArea(child: pages[_index]),
         floatingActionButton: FloatingActionButton(
           backgroundColor: AppColors.coral,
-          tooltip: 'พิมพ์บันทึกรายการ',
-          onPressed: () => showConversationalEntrySheet(context),
-          child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+          tooltip: 'บันทึกเร็ว',
+          onPressed: () => showQuickRecordSheet(context),
+          child: const Icon(Icons.bolt, color: Colors.white),
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,
@@ -168,6 +172,9 @@ class _HomeShellState extends State<HomeShell> {
       await notifications.refreshSchedules(goalName: goalName);
       return;
     }
+    // เว้นช่วง undo ให้จบก่อน ไม่ให้ permission dialog บังผลตอบแทนทันที
+    await Future<void>.delayed(const Duration(seconds: 5));
+    if (!mounted || notifications.preferences.permissionPromptHandled) return;
     final enable = await showDialog<bool>(
       context: context,
       barrierDismissible: false,

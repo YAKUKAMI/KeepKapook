@@ -8,6 +8,7 @@ import '../utils/format.dart';
 import '../widgets/goal_card.dart';
 import '../widgets/conversational_entry_sheet.dart';
 import '../widgets/habit_calendar_card.dart';
+import '../widgets/quick_record_sheet.dart';
 import 'goal_detail_screen.dart';
 import 'add_saving_screen.dart';
 import 'scan_slip_screen.dart';
@@ -111,6 +112,8 @@ class DashboardScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
+        const QuickRecordLauncher(),
+        const SizedBox(height: 12),
         const ConversationalEntryLauncher(),
         const SizedBox(height: 16),
 

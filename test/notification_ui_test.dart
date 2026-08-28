@@ -93,6 +93,8 @@ void main() {
     expect(find.text('ให้เราช่วยเตือนแบบเบา ๆ ไหม?'), findsNothing);
 
     app.addLedger(LedgerType.expense, 15000, 'อาหาร', 'ข้าวขาหมู');
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
 
     expect(find.text('ให้เราช่วยเตือนแบบเบา ๆ ไหม?'), findsOneWidget);

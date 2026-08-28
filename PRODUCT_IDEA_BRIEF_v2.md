@@ -482,16 +482,17 @@ preview ก่อนลง ledger · unlink และลบบัญชีได
 - [x] conversational parser + confidence tiers + undo + แก้ไข/ลบย้อนหลัง
 - [x] streak + ปฏิทินการออม
 - [x] local notification (เตือนบันทึก + เตือน review)
+- [x] quick record ในแอป: ปุ่มออม 20/50/100 + รายจ่ายสั้น + undo 5 วินาที
 - [ ] weekly review + first-week review วันที่ 7
 - [ ] event tracking แบบไม่เก็บข้อมูลละเอียดเกินจำเป็น
 
 **ตัดออกจาก Phase 1:** monthly review ฉบับเต็ม · coaching insight ที่ซับซ้อน ·
-shareable card · quick add widget · challenge — ทั้งหมดนี้ดี แต่ไม่ใช่ตัวพิสูจน์สมมติฐาน
+shareable card · OS home screen widget · challenge — ทั้งหมดนี้ดี แต่ไม่ใช่ตัวพิสูจน์สมมติฐาน
 
 ### Phase 2 — ขยายเหตุผลที่กลับมา (หลังผ่าน gate 1)
 
 monthly review + ดูย้อนหลัง · **reconciliation ritual (§8)** ·
-insight เชื่อมรายจ่ายกับวันถึงเป้า · shareable progress card · quick add · challenge รายเดือน
+insight เชื่อมรายจ่ายกับวันถึงเป้า · shareable progress card · OS home screen widget · challenge รายเดือน
 
 ### Phase 3 — Cloud (มีเงื่อนไข ไม่ใช่แผนที่ตายตัว)
 

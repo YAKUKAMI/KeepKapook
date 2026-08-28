@@ -8,6 +8,7 @@ import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 import '../utils/habit_streak.dart';
 import '../utils/parser/parser.dart';
+import '../utils/quick_entry.dart';
 import 'backup.dart';
 import 'domain_validation.dart';
 import 'migrations.dart';
@@ -15,6 +16,7 @@ import 'migrations.dart';
 export 'domain_validation.dart';
 
 part 'conversational_entries.dart';
+part 'quick_entries.dart';
 
 const appStateStorageKey = 'keepkapook_state_v1';
 const appStateCorruptBackupKey = '${appStateStorageKey}_corrupt_backup';
