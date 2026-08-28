@@ -7,6 +7,7 @@ import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 import '../widgets/goal_card.dart';
 import '../widgets/conversational_entry_sheet.dart';
+import '../widgets/habit_calendar_card.dart';
 import 'goal_detail_screen.dart';
 import 'add_saving_screen.dart';
 import 'scan_slip_screen.dart';
@@ -19,12 +20,15 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final lp = levelProgress(app.user.exp);
+    final now = DateTime.now();
     final money = summarizeDashboardMoney(
       goals: app.goals,
       ledger: app.ledger,
       transactions: app.transactions,
-      now: DateTime.now(),
+      now: now,
     );
+    final habitEntries = app.habitEntries;
+    final habit = app.habitSummary(now: now);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -108,6 +112,13 @@ class DashboardScreen extends StatelessWidget {
         const SizedBox(height: 16),
 
         const ConversationalEntryLauncher(),
+        const SizedBox(height: 16),
+
+        HabitCalendarCard(
+          summary: habit,
+          entries: habitEntries,
+          today: now,
+        ),
         const SizedBox(height: 16),
 
         // ยอดรวม

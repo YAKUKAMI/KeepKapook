@@ -95,6 +95,9 @@ String formatThaiDate(DateTime d, {bool short = false}) {
   return '${d.day} ${_thaiMonths[d.month - 1]} $year';
 }
 
+String formatThaiMonthYear(DateTime d) =>
+    '${_thaiMonths[d.month - 1]} ${d.year + 543}';
+
 int daysLeft(DateTime target) {
   final diff = target.difference(DateTime.now()).inHours / 24;
   return diff.ceil().clamp(0, 1 << 30);

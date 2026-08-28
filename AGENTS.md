@@ -51,10 +51,11 @@ lib/
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
 ├─ utils/financial_summary.dart  pure summaries: goal totals/progress, monthly ledger,
 │                            7-day saving series (รับ `now` จาก caller)
+├─ utils/habit_streak.dart   pure local-day/streak/grace/calendar/reward summaries
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
 ├─ utils/parser/             pure-Dart parser + models + dictionary
 ├─ widgets/                  goal_card, celebration, simulation_notice,
-│                            conversational_entry_sheet
+│                            conversational_entry_sheet, habit_calendar_card
 └─ screens/                  dashboard, goals, goal_detail, new_goal, add_saving,
                              scan_slip, quests, achievements, history, unallocated,
                              settings, ledger, onboarding
@@ -79,7 +80,7 @@ test/
                                     support file ไม่ใช่ test entrypoint)
 ```
 
-**หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 647 บรรทัดแม้แยก conversational action
+**หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 779 บรรทัดแม้แยก conversational action
 เป็น part แล้ว; `models.dart` ยังรวมทุก entity ไว้ไฟล์เดียว
 ถ้าไฟล์ไหนเกิน ~800 บรรทัด ให้แตกก่อนเพิ่มโค้ดใหม่
 (`models/` แยกตาม entity, `state/` แยกเป็น mixin/part ตามโดเมน: goal / ledger / gamification)
@@ -170,6 +171,7 @@ test/
 - เก็บ timestamp เป็น **UTC** เสมอ แสดงผลเป็น local
 - นิยาม "วัน" = local midnight (Asia/Bangkok) ใช้ helper ตัวเดียวกันทั้งแอป ห้ามคำนวณ `DateTime.now().difference()` ตรงๆ ในหน้าจอ
 - ฟีเจอร์ที่ผูกกับวัน: กราฟ 7 วัน, streak, ล็อกเงิน 7/30/90 วัน, quest รายวัน
+- streak คำนวณจาก timestamp ของ ledger และ `externalIn` ที่เข้า goal ผ่าน `habit_streak.dart`; grace day รักษาจำนวนเดิมแต่ไม่นับวันที่ขาดเพิ่ม และไม่มี cache/field persistence จึงไม่ต้อง bump schema
 - ล็อกเงินต้องเทียบกับ `unlockAt` ที่บันทึกไว้ ไม่ใช่นับถอยหลังจากเวลาปัจจุบัน (กันผู้ใช้หมุนนาฬิกาเครื่อง)
 - **สถานะโค้ดปัจจุบันยังไม่ทำตามกฎนี้ครบ:** timestamp บาง action ยังสร้างจาก local `DateTime.now()`; สูตรกราฟ 7 วันอยู่ใน `financial_summary.dart`, รับ `now` และนับเฉพาะ `externalIn` แล้ว แต่ยังเทียบ `t.date` ตรงๆ โดยไม่แปลง timezone
 
@@ -187,7 +189,8 @@ test/
 - **ไม่มีข้อมูล mock** — เริ่มว่างเปล่าผ่าน onboarding, Settings มี "ล้างข้อมูลทั้งหมด"
 - **สำรอง/กู้คืนข้อมูล:** export JSON ออกนอกแอปและ import พร้อม preview/ยืนยัน โดยทำงานบน web และ mobile
 - **Conversational Ledger:** deterministic pure-Dart parser, confidence tier, บันทึกทันทีพร้อม undo, chip แก้ field, คำถามเมื่อกำกวม และแก้/ลบย้อนหลังจาก History/Ledger
-- quest ปัจจุบันมี `q-deposit` และ `q-allocate` พร้อม event handler ทั้งคู่; badge default 4 ตัวมีเงื่อนไขใน `_recomputeBadges()` ครบ ส่วน `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
+- **Streak + ปฏิทิน:** current/longest streak, ผ่อนผัน 1 วัน, ปฏิทินเดือนและรายการรายวันบน Dashboard; คำนวณใหม่จากประวัติ ไม่หัก EXP เมื่อขาด
+- quest ปัจจุบันมี `q-deposit`, `q-allocate`, `q-weekly-consistency` พร้อม event handler; badge default 5 ตัวรวม `b-rhythm` มีเงื่อนไขครบ ส่วน `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
 
 ---
 
@@ -316,7 +319,7 @@ void someAction(...) {
 - [ ] Privacy policy + นโยบายรูปสลิป (มี PII: เลขบัญชี/ชื่อ) — ไม่อัปโหลดออกนอกเครื่อง, ขอ permission ให้ถูก
 
 ### P1 — ฟีเจอร์ที่ควรมี เรียงตามผลต่อ retention
-- [ ] **Streak + ปฏิทินการออม** — แกน "ไม่เลิกกลางทาง" ที่ยังหายไป ถูกและตรง positioning ที่สุด
+- [x] **Streak + ปฏิทินการออม** — current/longest + grace 1 วัน + ดูรายการตามวันบน Dashboard
 - [ ] **Local notification เตือนออม** (`flutter_local_notifications`, ทำงาน offline) — habit app ที่ไม่เตือนคือรอให้ผู้ใช้ลืม
 - [ ] **แก้ไขเป้าหมาย** — ส่วนแก้/ลบรายการย้อนหลังและ undo ของ conversational entry ทำแล้ว
 - [ ] **Insight รายจ่ายที่แปลงเป็นเวลา** — ไม่ใช่แค่ pie chart แต่ "ลดกาแฟสัปดาห์ละ 2 แก้ว = ถึงเป้าเร็วขึ้น 12 วัน" ← จุดที่ MAKE ไม่ทำ
@@ -328,8 +331,8 @@ void someAction(...) {
 - [x] แก้กราฟ 7 วันและค่าเฉลี่ยเงินออมให้นับจาก `TransactionFlow.externalIn`
 - [x] `q-allocate` มี handler จาก event จัดสรรจริง และไม่แจก base/milestone EXP ซ้ำ
 - [ ] คืน `q-weekly-review` ในรอบ 13 เมื่อ Weekly Review มี completion event และเทส progress จริง (ถอนจาก default/state ที่ยังไม่สำเร็จใน schema v5)
-- [ ] คืน `q-weekly-consistency` ในรอบ 11 เมื่อระบบ streak มี event source และเทส progress จริง (ถอนจาก default/state ใน schema v5)
-- [ ] คืน `b-rhythm` ในรอบ 11 เมื่อ streak unlock ได้จริง; badge ของผู้ใช้เดิมที่ unlock แล้วต้องคงอยู่ (ถอนเฉพาะตัวที่ยังไม่ unlock ใน schema v5)
+- [x] คืน `q-weekly-consistency` เมื่อระบบ streak มี event source และเทส progress จริง
+- [x] คืน `b-rhythm` เมื่อ streak 7 วัน unlock ได้จริง; badge ที่เคย unlock ยังคงอยู่
 - [ ] พิจารณา `b-memory` ใหม่เมื่อมี Album subsystem ที่อนุมัติเข้าแผนหลัง Phase 2 และมี unlock event/test; ตอนนี้ลบจาก default และถอนเฉพาะตัวที่ยังไม่ unlock ใน schema v5
 - [ ] เพิ่ม category selector ใน NewGoal และกำหนดพฤติกรรมของ `GoalPriority` (ปัจจุบัน persist อย่างเดียว)
 - [x] เพิ่ม `TransactionFlow` + `destinationGoalId` และ migration v2→v3; transaction ใหม่ไม่เก็บข้อมูลโครงสร้างใน `note`
@@ -342,7 +345,7 @@ void someAction(...) {
 - [ ] Goal Album (รูปเป้าหมาย)
 - [ ] bundle ฟอนต์ Prompt เข้า assets
 - [ ] crash reporting + analytics (รู้ว่าผู้ใช้เลิกตรงไหน)
-- [ ] แตก god file `models.dart` / `app_state.dart` ต่อ (`app_state.dart` ยัง 647 บรรทัด; conversational part แยกแล้ว)
+- [ ] แตก god file `models.dart` / `app_state.dart` ต่อ (`app_state.dart` ยัง 779 บรรทัด; conversational part แยกแล้ว)
 - [ ] OCR อ่านสลิปอัตโนมัติ — `google_mlkit_text_recognition` mobile-only ต้อง conditional import + stub สำหรับ web ไม่งั้น `flutter build web` พัง
 
 ### ไม่ทำ (out of scope)

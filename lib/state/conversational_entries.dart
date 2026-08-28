@@ -99,7 +99,7 @@ extension ConversationalEntryActions on AppState {
       rethrow;
     }
 
-    _recomputeBadges();
+    _refreshHabitRewards(asOf: DateTime.now());
     _saveAndNotify();
     return ConversationalSaveReceipt(
       beforeState: beforeState,
@@ -138,6 +138,7 @@ extension ConversationalEntryActions on AppState {
       ..category = category
       ..note = note
       ..date = date.toUtc();
+    _refreshHabitRewards(asOf: date);
     _saveAndNotify();
     return true;
   }
@@ -158,6 +159,7 @@ extension ConversationalEntryActions on AppState {
       throw DomainValidationException.missingEntity('รายการบัญชี', id);
     }
     ledger[index].date = date.toUtc();
+    _refreshHabitRewards(asOf: date);
     _saveAndNotify();
     return true;
   }
@@ -183,6 +185,7 @@ extension ConversationalEntryActions on AppState {
       ..note = note
       ..date = date.toUtc();
     _refreshGoalStatuses(date.toUtc());
+    _refreshHabitRewards(asOf: date);
     _saveAndNotify();
     return const HistoryMutationResult.success();
   }
@@ -201,6 +204,7 @@ extension ConversationalEntryActions on AppState {
 
     transactions.removeAt(index);
     _refreshGoalStatuses(DateTime.now().toUtc());
+    _refreshHabitRewards(asOf: DateTime.now());
     _saveAndNotify();
     return const HistoryMutationResult.success();
   }

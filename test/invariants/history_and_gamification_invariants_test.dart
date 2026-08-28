@@ -85,6 +85,17 @@ void main() {
         app.unallocatedSatang = 100;
         app.allocateUnallocated(100, 'goal');
       },
+      'q-weekly-consistency': (app) {
+        for (var index = 0; index < 5; index++) {
+          app.addLedger(
+            LedgerType.expense,
+            100,
+            'อาหาร',
+            '',
+            date: invariantTime.add(Duration(days: index)),
+          );
+        }
+      },
     };
     final violations = <String>[];
 
@@ -167,6 +178,17 @@ void main() {
             amountSatang: 100,
             goalId: goal.id,
             date: invariantTime,
+          );
+        }
+      },
+      'b-rhythm': (app) {
+        for (var index = 0; index < 7; index++) {
+          app.addLedger(
+            LedgerType.expense,
+            100,
+            'อาหาร',
+            '',
+            date: invariantTime.add(Duration(days: index)),
           );
         }
       },

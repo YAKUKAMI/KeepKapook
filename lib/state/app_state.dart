@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../utils/financial_summary.dart';
 import '../utils/format.dart';
+import '../utils/habit_streak.dart';
 import '../utils/parser/parser.dart';
 import 'backup.dart';
 import 'domain_validation.dart';
@@ -81,7 +82,7 @@ class AppState extends ChangeNotifier {
         final rawState = _jsonObject(decoded);
         final fromVersion = readSchemaVersion(rawState);
         final migrated = migrateState(rawState, fromVersion);
-        _fromJson(migrated);
+        _fromJson(migrated, hydrateCurrentDefinitions: true);
 
         final needsRewrite = !rawState.containsKey('schemaVersion') ||
             fromVersion != currentSchemaVersion;
@@ -190,7 +191,7 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      _fromJson(backup.migratedState);
+      _fromJson(backup.migratedState, hydrateCurrentDefinitions: true);
       final restoredRaw = jsonEncode(toJson());
       final restored = await prefs.setString(appStateStorageKey, restoredRaw);
       if (!restored) throw StateError('เขียนข้อมูลที่กู้คืนไม่สำเร็จ');
@@ -214,16 +215,21 @@ class AppState extends ChangeNotifier {
         'unallocatedSatang': unallocatedSatang,
       };
 
-  void _fromJson(Map<String, dynamic> j) {
+  void _fromJson(
+    Map<String, dynamic> j, {
+    bool hydrateCurrentDefinitions = false,
+  }) {
     user = AppUser.fromJson(_jsonObject(j['user']));
     goals = _jsonList(j['goals'], Goal.fromJson);
     transactions = _jsonList(j['transactions'], SavingTransaction.fromJson);
     quests = _jsonList(j['quests'], Quest.fromJson);
     badges = _jsonList(j['badges'], AchievementBadge.fromJson);
     ledger = _jsonList(j['ledger'], LedgerEntry.fromJson);
-    if (quests.isEmpty) quests = _defaultQuests();
-    if (badges.isEmpty) badges = _defaultBadges();
     unallocatedSatang = j['unallocatedSatang'] as int? ?? 0;
+    if (hydrateCurrentDefinitions) {
+      _ensureGamificationDefinitions();
+      _refreshHabitRewards(asOf: DateTime.now());
+    }
   }
 
   @override
@@ -238,9 +244,11 @@ class AppState extends ChangeNotifier {
     LedgerType type,
     num amountSatang,
     String category,
-    String note,
-  ) {
+    String note, {
+    DateTime? date,
+  }) {
     final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
+    final recordedAt = (date ?? DateTime.now()).toUtc();
     ledger.insert(
       0,
       LedgerEntry(
@@ -249,11 +257,11 @@ class AppState extends ChangeNotifier {
         amountSatang: validatedAmountSatang,
         category: category,
         note: note,
-        date: DateTime.now().toUtc(),
+        date: recordedAt,
       ),
     );
-    _save();
-    notifyListeners();
+    _refreshHabitRewards(asOf: recordedAt);
+    _saveAndNotify();
   }
 
   void deleteLedger(String id) {
@@ -262,8 +270,8 @@ class AppState extends ChangeNotifier {
       throw DomainValidationException.missingEntity('รายการบัญชี', id);
     }
     ledger.removeAt(index);
-    _save();
-    notifyListeners();
+    _refreshHabitRewards(asOf: DateTime.now());
+    _saveAndNotify();
   }
 
   LedgerPeriodSummary ledgerMonthSummary({required DateTime now}) =>
@@ -411,6 +419,12 @@ class AppState extends ChangeNotifier {
       goals.where((goal) => !goal.isCompleted).toList();
   List<Goal> get completedGoals =>
       goals.where((goal) => goal.isCompleted).toList();
+  List<HabitEntry> get habitEntries => collectHabitEntries(
+        ledger: ledger,
+        transactions: transactions,
+      );
+  HabitStreakSummary habitSummary({required DateTime now}) =>
+      summarizeHabitEntries(habitEntries, asOf: now);
 
   // ---------- actions ----------
   Goal addGoal({
@@ -574,7 +588,7 @@ class AppState extends ChangeNotifier {
     }
 
     user.exp += exp;
-    _recomputeBadges();
+    _refreshHabitRewards(asOf: now);
     if (persist) {
       _save();
       notifyListeners();
@@ -604,6 +618,21 @@ class AppState extends ChangeNotifier {
     final quest = quests.where((entry) => entry.id == id).firstOrNull;
     if (quest == null || quest.claimed) return;
     quest.progress = (quest.progress + 1).clamp(0, quest.target);
+  }
+
+  void _refreshHabitRewards({required DateTime asOf}) {
+    final entries = habitEntries;
+    final summary = summarizeHabitEntries(
+      entries,
+      asOf: latestHabitTimestamp(entries, fallback: asOf),
+    );
+    final quest =
+        quests.where((entry) => entry.id == 'q-weekly-consistency').firstOrNull;
+    if (quest != null && !quest.claimed) {
+      final reached = habitProgressToward(summary, quest.target);
+      if (reached > quest.progress) quest.progress = reached;
+    }
+    _recomputeBadges(habit: summary);
   }
 
   int _awardNewMilestones(Goal goal) {
@@ -687,24 +716,35 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  void _recomputeBadges() {
+  void _recomputeBadges({HabitStreakSummary? habit}) {
+    final habitSummaryValue = habit ?? habitSummary(now: DateTime.now());
     final completedCount = completedGoals.length;
     final anyHalf = goals.any(
       (goal) => goal.hasSavingsTarget && goal.progress >= 0.5,
     );
     for (final b in badges) {
       if (b.id == 'b-first-drop') {
-        b.unlocked = transactions.isNotEmpty;
+        b.unlocked = b.unlocked || transactions.isNotEmpty;
         b.progress = b.unlocked ? 1 : 0;
+      } else if (b.id == 'b-rhythm') {
+        b.unlocked = b.unlocked || hasReachedHabitTarget(habitSummaryValue, 7);
+        final recalculatedProgress = habitProgressRatio(habitSummaryValue, 7);
+        if (recalculatedProgress > b.progress) {
+          b.progress = recalculatedProgress;
+        }
       } else if (b.id == 'b-halfway') {
-        b.unlocked = anyHalf;
-        if (anyHalf) b.progress = 1;
+        b.unlocked = b.unlocked || anyHalf;
+        if (b.unlocked) b.progress = 1;
       } else if (b.id == 'b-crusher') {
-        b.unlocked = completedCount >= 1;
-        b.progress = completedCount.clamp(0, 1).toDouble();
+        b.unlocked = b.unlocked || completedCount >= 1;
+        if (b.unlocked) b.progress = 1;
       } else if (b.id == 'b-triple') {
-        b.unlocked = completedCount >= 3;
-        b.progress = (completedCount / 3).clamp(0, 1);
+        b.unlocked = b.unlocked || completedCount >= 3;
+        final recalculatedProgress =
+            (completedCount / 3).clamp(0, 1).toDouble();
+        if (recalculatedProgress > b.progress) {
+          b.progress = recalculatedProgress;
+        }
       }
     }
   }
@@ -731,6 +771,19 @@ class AppState extends ChangeNotifier {
     _recomputeBadges();
   }
 
+  void _ensureGamificationDefinitions() {
+    for (final definition in _defaultQuests()) {
+      if (!quests.any((entry) => entry.id == definition.id)) {
+        quests.add(definition);
+      }
+    }
+    for (final definition in _defaultBadges()) {
+      if (!badges.any((entry) => entry.id == definition.id)) {
+        badges.add(definition);
+      }
+    }
+  }
+
   List<Quest> _defaultQuests() => [
         Quest(
             id: 'q-deposit',
@@ -746,6 +799,13 @@ class AppState extends ChangeNotifier {
             period: 'daily',
             target: 1,
             expReward: 15),
+        Quest(
+            id: 'q-weekly-consistency',
+            title: 'รักษาความสม่ำเสมอ',
+            description: 'บันทึกต่อเนื่องให้ครบ 5 วัน',
+            period: 'weekly',
+            target: 5,
+            expReward: 40),
       ];
 
   List<AchievementBadge> _defaultBadges() => [
@@ -755,6 +815,12 @@ class AppState extends ChangeNotifier {
             description: 'ออมครั้งแรก',
             emoji: '💧',
             condition: 'บันทึกเงินออมครั้งแรก'),
+        AchievementBadge(
+            id: 'b-rhythm',
+            name: '7-Day Rhythm',
+            description: 'บันทึกต่อเนื่องครบ 7 วัน',
+            emoji: '🎵',
+            condition: 'ทำ streak จากวันบันทึกครบ 7 วัน'),
         AchievementBadge(
             id: 'b-halfway',
             name: 'Halfway Hero',
