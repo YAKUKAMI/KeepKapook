@@ -29,7 +29,7 @@ KeepKapook = แอปสร้างนิสัยการออมเงิ�
 | Persist | `shared_preferences` (serialize state ทั้งก้อนเป็น JSON) |
 | กราฟ | `fl_chart` |
 | ฟอนต์ | `google_fonts` (Prompt) — ดูข้อควรระวังใน §8 |
-| อื่นๆ | `intl`, `uuid`, `image_picker`, `file_selector`, `share_plus`, `package_info_plus` |
+| อื่นๆ | `intl`, `uuid`, `image_picker`, `file_selector`, `share_plus`, `package_info_plus`, `flutter_local_notifications`, `timezone` |
 
 ก่อนใช้ API ใดๆ ให้เช็ก constraint ใน `pubspec.yaml` จริง อย่าเดาจากเวอร์ชันในตารางนี้
 
@@ -48,14 +48,17 @@ lib/
 ├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3→v4→v5)
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
+├─ services/notifications/  controller + preference store + conditional mobile implementation/web stub
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
 ├─ utils/financial_summary.dart  pure summaries: goal totals/progress, monthly ledger,
 │                            7-day saving series (รับ `now` จาก caller)
 ├─ utils/habit_streak.dart   pure local-day/streak/grace/calendar/reward summaries
+├─ utils/notification_schedule.dart  pure daily/weekly schedule + reminder copy
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
 ├─ utils/parser/             pure-Dart parser + models + dictionary
 ├─ widgets/                  goal_card, celebration, simulation_notice,
-│                            conversational_entry_sheet, habit_calendar_card
+│                            conversational_entry_sheet, habit_calendar_card,
+│                            notification_settings_card
 └─ screens/                  dashboard, goals, goal_detail, new_goal, add_saving,
                              scan_slip, quests, achievements, history, unallocated,
                              settings, ledger, onboarding
@@ -75,12 +78,14 @@ test/
 ├─ invariants/migration_chain_invariant_test.dart  I14 full-chain + TOTAL
 ├─ parser_test.dart          corpus accuracy + parser edge cases
 ├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
+├─ notification_schedule_test.dart / notification_controller_test.dart
+├─ notification_ui_test.dart       schedule, permission-on-first-save, Settings/web stub
 ├─ historical_edit_test.dart       edit/delete history + ledger
 └─ fixtures/parser_corpus.dart     corpus synthetic 37 ประโยค (ยังไม่ใช่ข้อมูลผู้ใช้จริง;
                                     support file ไม่ใช่ test entrypoint)
 ```
 
-**หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 779 บรรทัดแม้แยก conversational action
+**หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 783 บรรทัดแม้แยก conversational action
 เป็น part แล้ว; `models.dart` ยังรวมทุก entity ไว้ไฟล์เดียว
 ถ้าไฟล์ไหนเกิน ~800 บรรทัด ให้แตกก่อนเพิ่มโค้ดใหม่
 (`models/` แยกตาม entity, `state/` แยกเป็น mixin/part ตามโดเมน: goal / ledger / gamification)
@@ -94,6 +99,7 @@ test/
 - SharedPreferences key: `keepkapook_state_v1`
 - Corrupt backup key: `keepkapook_state_v1_corrupt_backup`
 - Pre-import backup key: `keepkapook_state_v1_pre_import_backup` — เก็บ state ปัจจุบันก่อนกู้คืนทับทุกครั้ง
+- การตั้งค่า local notification ใช้ SharedPreferences keys prefix `keepkapook_notification_` แยกจาก state JSON; ไม่มีข้อมูลการเงินและไม่ทำให้ schemaVersion เปลี่ยน
 - รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 5` และ migration framework ที่ `lib/state/migrations.dart`
 
 ตัวอย่างย่อของ JSON ที่ persist จริงในปัจจุบัน:
@@ -172,6 +178,7 @@ test/
 - นิยาม "วัน" = local midnight (Asia/Bangkok) ใช้ helper ตัวเดียวกันทั้งแอป ห้ามคำนวณ `DateTime.now().difference()` ตรงๆ ในหน้าจอ
 - ฟีเจอร์ที่ผูกกับวัน: กราฟ 7 วัน, streak, ล็อกเงิน 7/30/90 วัน, quest รายวัน
 - streak คำนวณจาก timestamp ของ ledger และ `externalIn` ที่เข้า goal ผ่าน `habit_streak.dart`; grace day รักษาจำนวนเดิมแต่ไม่นับวันที่ขาดเพิ่ม และไม่มี cache/field persistence จึงไม่ต้อง bump schema
+- local notification ใช้เวลา Asia/Bangkok จาก `notification_schedule.dart`: รายวันค่าเริ่มต้น 20:00 และสรุปวันจันทร์ 09:00; ใช้ schedule id คงที่ประเภทละหนึ่ง id เพื่อไม่ให้ตั้งซ้ำ
 - ล็อกเงินต้องเทียบกับ `unlockAt` ที่บันทึกไว้ ไม่ใช่นับถอยหลังจากเวลาปัจจุบัน (กันผู้ใช้หมุนนาฬิกาเครื่อง)
 - **สถานะโค้ดปัจจุบันยังไม่ทำตามกฎนี้ครบ:** timestamp บาง action ยังสร้างจาก local `DateTime.now()`; สูตรกราฟ 7 วันอยู่ใน `financial_summary.dart`, รับ `now` และนับเฉพาะ `externalIn` แล้ว แต่ยังเทียบ `t.date` ตรงๆ โดยไม่แปลง timezone
 
@@ -190,6 +197,7 @@ test/
 - **สำรอง/กู้คืนข้อมูล:** export JSON ออกนอกแอปและ import พร้อม preview/ยืนยัน โดยทำงานบน web และ mobile
 - **Conversational Ledger:** deterministic pure-Dart parser, confidence tier, บันทึกทันทีพร้อม undo, chip แก้ field, คำถามเมื่อกำกวม และแก้/ลบย้อนหลังจาก History/Ledger
 - **Streak + ปฏิทิน:** current/longest streak, ผ่อนผัน 1 วัน, ปฏิทินเดือนและรายการรายวันบน Dashboard; คำนวณใหม่จากประวัติ ไม่หัก EXP เมื่อขาด
+- **Local notification:** เตือนบันทึกประจำวัน + ดูสรุปเช้าวันจันทร์ ปรับเวลา/ปิดแยกได้, ขอสิทธิ์หลังบันทึกแรก, ทำงานในเครื่อง; web ใช้ stub และซ่อนเมนู
 - quest ปัจจุบันมี `q-deposit`, `q-allocate`, `q-weekly-consistency` พร้อม event handler; badge default 5 ตัวรวม `b-rhythm` มีเงื่อนไขครบ ส่วน `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
 
 ---
@@ -320,7 +328,7 @@ void someAction(...) {
 
 ### P1 — ฟีเจอร์ที่ควรมี เรียงตามผลต่อ retention
 - [x] **Streak + ปฏิทินการออม** — current/longest + grace 1 วัน + ดูรายการตามวันบน Dashboard
-- [ ] **Local notification เตือนออม** (`flutter_local_notifications`, ทำงาน offline) — habit app ที่ไม่เตือนคือรอให้ผู้ใช้ลืม
+- [x] **Local notification เตือนออม** (`flutter_local_notifications`, ทำงาน offline) — รายวัน + สรุปวันจันทร์, conditional mobile/web stub
 - [ ] **แก้ไขเป้าหมาย** — ส่วนแก้/ลบรายการย้อนหลังและ undo ของ conversational entry ทำแล้ว
 - [ ] **Insight รายจ่ายที่แปลงเป็นเวลา** — ไม่ใช่แค่ pie chart แต่ "ลดกาแฟสัปดาห์ละ 2 แก้ว = ถึงเป้าเร็วขึ้น 12 วัน" ← จุดที่ MAKE ไม่ทำ
 - [ ] **Challenge การออม** — ออม 365 วันทวีคูณ / สัปดาห์ไม่ใช้เงิน / เก็บเศษสตางค์ (ต่อยอด quest+badge ที่มีอยู่)
@@ -345,7 +353,7 @@ void someAction(...) {
 - [ ] Goal Album (รูปเป้าหมาย)
 - [ ] bundle ฟอนต์ Prompt เข้า assets
 - [ ] crash reporting + analytics (รู้ว่าผู้ใช้เลิกตรงไหน)
-- [ ] แตก god file `models.dart` / `app_state.dart` ต่อ (`app_state.dart` ยัง 779 บรรทัด; conversational part แยกแล้ว)
+- [ ] แตก god file `models.dart` / `app_state.dart` ต่อ (`app_state.dart` ยัง 783 บรรทัด; conversational part แยกแล้ว)
 - [ ] OCR อ่านสลิปอัตโนมัติ — `google_mlkit_text_recognition` mobile-only ต้อง conditional import + stub สำหรับ web ไม่งั้น `flutter build web` พัง
 
 ### ไม่ทำ (out of scope)

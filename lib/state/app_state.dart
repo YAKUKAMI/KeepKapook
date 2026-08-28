@@ -65,6 +65,9 @@ class AppState extends ChangeNotifier {
   int unallocatedSatang = 0;
   bool loaded = false;
   String? loadErrorMessage;
+  int _recordSavedSerial = 0;
+
+  int get recordSavedSerial => _recordSavedSerial;
 
   // ---------- persistence ----------
   Future<void> load() async {
@@ -261,6 +264,7 @@ class AppState extends ChangeNotifier {
       ),
     );
     _refreshHabitRewards(asOf: recordedAt);
+    _recordSavedSerial++;
     _saveAndNotify();
   }
 
@@ -590,6 +594,7 @@ class AppState extends ChangeNotifier {
     user.exp += exp;
     _refreshHabitRewards(asOf: now);
     if (persist) {
+      _recordSavedSerial++;
       _save();
       notifyListeners();
     }

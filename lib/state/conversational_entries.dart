@@ -100,6 +100,7 @@ extension ConversationalEntryActions on AppState {
     }
 
     _refreshHabitRewards(asOf: DateTime.now());
+    _recordSavedSerial++;
     _saveAndNotify();
     return ConversationalSaveReceipt(
       beforeState: beforeState,

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'services/notifications/notification_controller.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
 import 'screens/dashboard_screen.dart';
@@ -8,12 +11,18 @@ import 'screens/quests_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'utils/notification_schedule.dart';
 import 'widgets/conversational_entry_sheet.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState()..load(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppState()..load()),
+        ChangeNotifierProvider(
+          create: (_) => NotificationController()..load(),
+        ),
+      ],
       child: const KeepKapookApp(),
     ),
   );
@@ -41,15 +50,20 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  int _handledRecordSavedSerial = 0;
+  bool _notificationWorkScheduled = false;
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final notifications = context.watch<NotificationController?>();
     if (!app.loaded) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator(color: AppColors.mint)),
       );
     }
+
+    _scheduleNotificationWork(app, notifications);
 
     late final Widget content;
     if (!app.user.onboarded) {
@@ -119,6 +133,88 @@ class _HomeShellState extends State<HomeShell> {
         ),
         Expanded(child: content),
       ],
+    );
+  }
+
+  void _scheduleNotificationWork(
+    AppState app,
+    NotificationController? notifications,
+  ) {
+    if (!app.user.onboarded ||
+        notifications == null ||
+        !notifications.isSupported ||
+        !notifications.loaded ||
+        app.recordSavedSerial <= _handledRecordSavedSerial ||
+        _notificationWorkScheduled) {
+      return;
+    }
+    _handledRecordSavedSerial = app.recordSavedSerial;
+    _notificationWorkScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notificationWorkScheduled = false;
+      if (!mounted) return;
+      unawaited(_handleRecordSaved(app, notifications));
+    });
+  }
+
+  Future<void> _handleRecordSaved(
+    AppState app,
+    NotificationController notifications,
+  ) async {
+    final goalName = selectReminderGoalName(
+      app.activeGoals.map((goal) => goal.name),
+    );
+    if (notifications.preferences.permissionPromptHandled) {
+      await notifications.refreshSchedules(goalName: goalName);
+      return;
+    }
+    final enable = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.white,
+        title: const Text('ให้เราช่วยเตือนแบบเบา ๆ ไหม?'),
+        content: const Text(
+          'KeepKapook เตือนได้ 2 แบบตามที่คุณเลือก\n\n'
+          '• กลับมาบันทึกประจำวัน เวลาเริ่มต้น 20:00\n'
+          '• ดูสรุปสัปดาห์ เช้าวันจันทร์ เวลาเริ่มต้น 09:00\n\n'
+          'เปลี่ยนเวลาหรือปิดแยกได้ในตั้งค่า และข้อมูลไม่ออกจากเครื่อง',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ไม่ใช้การเตือน'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('เปิดการเตือน'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (enable != true) {
+      await notifications.declinePermissionOffer();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ได้เลย แอปจะไม่ถามสิทธิ์ซ้ำและยังใช้ได้ตามปกติ'),
+        ),
+      );
+      return;
+    }
+    final granted = await notifications.acceptPermissionOffer(
+      goalName: goalName,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          granted
+              ? 'เปิดการเตือนแล้ว ปรับเวลาได้ที่หน้าตั้งค่า'
+              : 'ไม่เป็นไร แอปจะไม่ถามสิทธิ์ซ้ำและยังใช้ได้ตามปกติ',
+        ),
+      ),
     );
   }
 }

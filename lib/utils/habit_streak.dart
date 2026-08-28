@@ -6,9 +6,23 @@ const Duration bangkokUtcOffset = Duration(hours: 7);
 ///
 /// timestamp ที่เป็น UTC จะถูกเลื่อนเป็น UTC+7 ก่อนตัดเวลา ส่วน timestamp
 /// legacy ที่ไม่มี timezone ถือว่าเก็บเป็นเวลาไทยอยู่แล้ว
+DateTime bangkokLocalWallClock(DateTime timestamp) {
+  if (!timestamp.isUtc) return timestamp;
+  final shifted = timestamp.add(bangkokUtcOffset);
+  return DateTime(
+    shifted.year,
+    shifted.month,
+    shifted.day,
+    shifted.hour,
+    shifted.minute,
+    shifted.second,
+    shifted.millisecond,
+    shifted.microsecond,
+  );
+}
+
 DateTime bangkokLocalDay(DateTime timestamp) {
-  final bangkokTime =
-      timestamp.isUtc ? timestamp.add(bangkokUtcOffset) : timestamp;
+  final bangkokTime = bangkokLocalWallClock(timestamp);
   return DateTime(bangkokTime.year, bangkokTime.month, bangkokTime.day);
 }
 

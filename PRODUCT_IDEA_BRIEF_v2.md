@@ -80,7 +80,7 @@ Recovery Plan · export/import JSON พร้อม migration + validation · de
 confidence tiers high/medium/low/reject · บันทึกทันทีพร้อม undo · inline correction ·
 แก้ไข/ลบรายการย้อนหลังจากหน้า History และ Ledger
 
-**ยังไม่มี:** weekly/monthly review แบบเต็ม · local notification ·
+**ยังไม่มี:** weekly/monthly review แบบเต็ม ·
 insight เชื่อมรายจ่ายกับวันถึงเป้า · reconciliation · cloud sync · บัญชีผู้ใช้ · LINE · OCR สลิป
 
 **มี streak แล้ว:** current/longest streak + ผ่อนผัน 1 วัน + ปฏิทินรายเดือนที่เปิดดูรายการตามวันบน Dashboard โดยคำนวณจาก timestamp ของรายการ ไม่เก็บ cache
@@ -481,7 +481,7 @@ preview ก่อนลง ledger · unlink และลบบัญชีได
 
 - [x] conversational parser + confidence tiers + undo + แก้ไข/ลบย้อนหลัง
 - [x] streak + ปฏิทินการออม
-- [ ] local notification (เตือนบันทึก + เตือน review)
+- [x] local notification (เตือนบันทึก + เตือน review)
 - [ ] weekly review + first-week review วันที่ 7
 - [ ] event tracking แบบไม่เก็บข้อมูลละเอียดเกินจำเป็น
 

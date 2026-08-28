@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/backup_file_service.dart';
+import '../services/notifications/notification_controller.dart';
 import '../state/app_state.dart';
 import '../state/backup.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import '../utils/notification_schedule.dart';
+import '../widgets/notification_settings_card.dart';
 import '../widgets/simulation_notice.dart';
 import 'achievements_screen.dart';
 import 'unallocated_screen.dart';
@@ -18,6 +21,10 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final notifications = context.watch<NotificationController?>();
+    final notificationGoalName = selectReminderGoalName(
+      app.activeGoals.map((goal) => goal.name),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -70,6 +77,11 @@ class SettingsScreen extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.mutedText)),
             ]),
+            if (notifications?.isSupported ?? false)
+              NotificationSettingsCard(
+                controller: notifications!,
+                goalName: notificationGoalName,
+              ),
             _section('ทางลัด', [
               ListTile(
                 contentPadding: EdgeInsets.zero,
