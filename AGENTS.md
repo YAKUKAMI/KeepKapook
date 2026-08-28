@@ -74,7 +74,8 @@ test/
 ├─ parser_test.dart          corpus accuracy + parser edge cases
 ├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
 ├─ historical_edit_test.dart       edit/delete history + ledger
-└─ fixtures/parser_corpus.dart     corpus 35 ประโยค (support file ไม่ใช่ test entrypoint)
+└─ fixtures/parser_corpus.dart     corpus synthetic 37 ประโยค (ยังไม่ใช่ข้อมูลผู้ใช้จริง;
+                                    support file ไม่ใช่ test entrypoint)
 ```
 
 **หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 647 บรรทัดแม้แยก conversational action
@@ -227,6 +228,8 @@ Workflow: `.github/workflows/definition-of-done.yml` ใช้ Flutter 3.47.1 �
 - ❌ **ห้ามแก้/ลบ field ใน model โดยไม่เขียน migration** (§4)
 - ❌ **ห้ามใส่ข้อมูล mock/seed กลับเข้าไปในแอป** — แอปต้องเริ่มว่างเปล่าผ่าน onboarding เสมอ
 - ❌ **ห้ามใช้ `double` กับยอดเงิน**
+- ❌ **logic ใหม่ทุกตัวใน Phase 1 ต้องเป็น pure function ใน `lib/utils/`** และต้องเทสได้โดยไม่สร้าง `AppState`; `AppState` มีหน้าที่ validate/orchestrate/apply/persist เท่านั้น ห้ามเพิ่มสูตรคำนวณใน `AppState` หรือคลาส widget แม้แต่บรรทัดเดียว
+- ❌ **ห้ามนับตัวอย่างที่ AI หรือทีมแต่งเองเป็น parser corpus จริง** — เป้าหมายก่อนเริ่มรอบ 9 คืออย่างน้อย 50 ประโยค โดยส่วนที่เพิ่มต้องเป็นข้อความที่กลุ่มเป้าหมายหรือผู้ใช้จดจริงแบบ verbatim (ลบ PII ได้ แต่ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
 - ❌ **ห้ามลบหรือลดความชัดของข้อความ disclaimer / label "จำลอง"** บนฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก (§1 และ `simulation_notice.dart`)
 - ❌ ห้าม refactor ใหญ่พ่วงมากับงานฟีเจอร์ — แยกคนละรอบ
 - ❌ ห้าม commit ไฟล์ signing key, `.env`, หรือ google-services.json ที่มี secret
@@ -250,7 +253,7 @@ Workflow: `.github/workflows/definition-of-done.yml` ใช้ Flutter 3.47.1 �
 - UI validation ต้องคงไว้เพื่อ UX; domain validation เป็นชั้นบังคับความถูกต้องและห้ามพึ่ง UI เพียงชั้นเดียว
 - สถานะปัจจุบันของ `_save()`: debounce 300ms, snapshot ตอน mutation, เขียนผ่าน ordered queue และรายงาน failure ด้วย `MaterialBanner`; mutation แจ้ง UI ได้ทันทีเพราะคิวรับประกันว่า snapshot เก่าจะไม่เขียนทับ snapshot ใหม่
 - ระวัง null-promotion ใน closure (ใช้ `x!` หรือแยกเป็น method)
-- Business logic อยู่ใน `utils/` หรือ `AppState` เท่านั้น — หน้าจอห้ามคำนวณเงิน/วัน/EXP เอง (ไม่งั้นเทสไม่ได้)
+- logic/สูตรคำนวณใหม่ใน Phase 1 อยู่ใน pure function ภายใต้ `lib/utils/` เท่านั้นและห้าม import Flutter; `AppState` เรียก helper เพื่อ orchestrate แล้ว apply state ส่วนหน้าจอ/widget รับผลลัพธ์ไปแสดง ห้ามคำนวณเงิน/วัน/EXP หรือสูตรโดเมนเอง
 
 ### UI
 - ใช้ `.withValues(alpha: x)` ไม่ใช่ `.withOpacity(x)` (deprecated)
@@ -269,7 +272,7 @@ Workflow: `.github/workflows/definition-of-done.yml` ใช้ Flutter 3.47.1 �
 `screens/xxx_screen.dart` → route/nav ใน `main.dart` → (ถ้ามีปุ่มเข้า) หน้าจอต้นทาง → เพิ่มเคสใน `test/smoke_test.dart`
 
 **เพิ่ม action ที่แก้ข้อมูล**
-เพิ่ม method ใน `state/app_state.dart` (จบด้วย `_save()` + `notifyListeners()`) → ถ้ามีการคำนวณ ให้แยก pure function ไป `utils/` → เขียน unit test ของ pure function นั้น → ต่อ UI
+เขียน pure function + unit test ใน `utils/` ก่อน → เพิ่ม method ใน `state/app_state.dart` ให้ validate/orchestrate/apply เท่านั้น (จบด้วย `_save()` + `notifyListeners()`) → ต่อ UI; ห้ามเริ่มจากเขียนสูตรใน `AppState` แล้วค่อยสัญญาว่าจะย้ายภายหลัง
 
 **เพิ่ม field ใน model**
 `models/models.dart` (ใส่ default ใน `fromJson`) → bump `schemaVersion` → เขียน migration → รันแอปด้วยข้อมูลเก่าดูว่าไม่พัง → unit test round-trip `toJson`/`fromJson`
@@ -297,6 +300,7 @@ void someAction(...) {
 ## 10. Backlog
 
 ### P0 — ต้องเสร็จก่อนปล่อยผู้ใช้จริง
+- [ ] ก่อนเริ่มรอบ 9 ขยาย parser corpus จาก synthetic 37 เคสเป็นอย่างน้อย 50 เคส โดยเคสที่เพิ่มต้องมาจากข้อความจริงของกลุ่มเป้าหมาย/การจดใช้จริง และห้ามให้ AI แต่งเพื่อดันจำนวน
 - [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v5)
 - [x] เปลี่ยนยอดเงินเป็น `int` สตางค์ + migration v1→v2
 - [x] Export / Import ข้อมูลเป็นไฟล์ JSON พร้อม validate, migration, preview และ pre-import backup
