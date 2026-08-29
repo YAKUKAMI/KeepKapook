@@ -218,9 +218,9 @@ KeepKapook ยังทำงานข้ามธนาคารและรว
 
 **สถานะ implementation ณ 27 ส.ค. 2569:** ทำ deterministic parser แบบ pure Dart แล้วที่
 `lib/utils/parser/` พร้อม dictionary แยกไฟล์, confidence ราย field, tier, operator,
-relative date, widget flow ตาม tier, undo และแก้/ลบย้อนหลัง ชุด corpus ปัจจุบันให้ accuracy
-amount/type/category/date 100% ใน fixture ของโปรเจกต์และ silent high error = 0
-(เป็นผลบน fixture 37 เคส ไม่ใช่ผลจากผู้ใช้จริง)
+relative date, widget flow ตาม tier, undo และแก้/ลบย้อนหลัง ชุด regression สังเคราะห์
+78 เคสที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้วอยู่ที่ `test/fixtures/parser_edge_cases.dart`
+เพื่อผูก regression gate 98/95/80 แต่ห้ามเรียกผลจากชุดนี้ว่า accuracy กับผู้ใช้จริง
 
 เป็น **ตัวคูณ** ไม่ใช่ตัว loop — เหตุผลที่คนเลิกจดรายจ่ายคือจดแล้วไม่ได้อะไรกลับมา
 ไม่ใช่เพราะฟอร์มมี 4 ช่อง การลดจาก 15 วินาทีเหลือ 5 วินาทีไม่แก้ปัญหานั้นด้วยตัวเอง
