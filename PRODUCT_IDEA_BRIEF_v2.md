@@ -28,7 +28,7 @@
 | รอบ | สถานะ | ข้ามอะไรได้ / ยังต้องทำอะไร |
 |---|---|---|
 | **A — Strategy & MVP** | ผ่านการทบทวนระดับเอกสารแล้ว | ข้ามการวิเคราะห์ positioning/MVP ซ้ำได้ แต่ยังต้องทำฟีเจอร์ Phase 1 ที่เหลือและวัด Gate 1 กับผู้ใช้จริง |
-| **B — Parser design** | implementation รอบแรกเสร็จแล้ว | ข้ามการออกแบบ parser ตั้งต้นได้: deterministic pipeline, `ParseResult`, confidence tiers, operator, UI/undo/edit-delete และ synthetic regression corpus ทำแล้ว; ก่อนปล่อยยังต้องมี corpus จริงอย่างน้อย 20 ประโยค |
+| **B — Parser design** | implementation + regression gate เสร็จแล้ว | ข้ามการออกแบบ parser ตั้งต้นได้: deterministic pipeline, `ParseResult`, confidence tiers, operator, UI/undo/edit-delete, synthetic corpus ที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้ว และ structural edge cases; accuracy ผู้ใช้จริงรอข้อความจริง ≥50 หลังรอบ 14 |
 | **C — Cloud & LINE** | ยังไม่เริ่ม | ห้ามข้าม gate; รอผล Gate 1 และหลักฐานจากผู้ใช้ตาม §10 |
 
 ทุกคำตอบต้องแยกให้ชัดว่าเป็น **ข้อเท็จจริง** / **สมมติฐาน** / **ข้อเสนอ**
@@ -88,8 +88,7 @@ confidence tiers high/medium/low/reject · บันทึกทันทีพ�
 
 **มี streak แล้ว:** current/longest streak + ผ่อนผัน 1 วัน + ปฏิทินรายเดือนที่เปิดดูรายการตามวันบน Dashboard โดยคำนวณจาก timestamp ของรายการ ไม่เก็บ cache
 
-**ข้อจำกัดของ implementation ปัจจุบัน:** parser fixture สังเคราะห์มี 37 เคส (amount assertion 36 เคส)
-และใช้เป็น regression ได้ แต่ยังไม่มี corpus จริงขั้นต่ำ 20 ประโยคจากผู้ใช้;
+**ข้อจำกัดของ implementation ปัจจุบัน:** parser มี synthetic regression corpus 37 ประโยคที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้ว และ structural edge cases 70 เคส แต่ยังไม่มีข้อความผู้ใช้จริง ≥50 จึงยังไม่มี user accuracy;
 กราฟ 7 วันและ date/time ยังทำตามกฎ UTC/local ไม่ครบ;
 `GoalPriority` persist ได้แต่ยังไม่มี UI/business logic ใช้งาน
 
@@ -216,9 +215,10 @@ KeepKapook ยังทำงานข้ามธนาคารและรว
 
 **สถานะ implementation ณ 27 ส.ค. 2569:** ทำ deterministic parser แบบ pure Dart แล้วที่
 `lib/utils/parser/` พร้อม dictionary แยกไฟล์, confidence ราย field, tier, operator,
-relative date, widget flow ตาม tier, undo และแก้/ลบย้อนหลัง ชุด corpus ปัจจุบันให้ accuracy
-amount/type/category/date 100% ใน fixture ของโปรเจกต์และ silent high error = 0
-(เป็นผลบน fixture 37 เคส ไม่ใช่ผลจากผู้ใช้จริง)
+relative date, widget flow ตาม tier, undo และแก้/ลบย้อนหลัง ชุด synthetic regression ปัจจุบันให้
+amount/type/category/date 100% ใน fixture 37 เคสและ silent high error = 0; structural fixture
+70 เคสผ่าน 66 เคสบังคับ และ 4 known limitation ไม่หลุดเป็น high
+(ตัวเลขทั้งหมดเป็น synthetic regression accuracy ไม่ใช่ผลจากผู้ใช้จริง)
 
 เป็น **ตัวคูณ** ไม่ใช่ตัว loop — เหตุผลที่คนเลิกจดรายจ่ายคือจดแล้วไม่ได้อะไรกลับมา
 ไม่ใช่เพราะฟอร์มมี 4 ช่อง การลดจาก 15 วินาทีเหลือ 5 วินาทีไม่แก้ปัญหานั้นด้วยตัวเอง
@@ -262,7 +262,7 @@ amount/type/category/date 100% ใน fixture ของโปรเจกต์�
 **LLM เป็น fallback ในอนาคตเท่านั้น** และต้องประเมิน ต้นทุน / privacy / latency / ความสม่ำเสมอ ก่อน
 ตราบใดที่ข้อมูลยังอยู่ในเครื่อง การส่งข้อความรายจ่ายออกไปหา LLM คือการทำลาย positioning
 
-### Corpus เริ่มต้น — 35 ประโยคสังเคราะห์ (ใช้เป็น regression เท่านั้น)
+### Synthetic regression corpus — 37 ประโยคที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้ว
 
 ```text
 # ง่าย
@@ -321,15 +321,15 @@ amount/type/category/date 100% ใน fixture ของโปรเจกต์�
 จ่ายค่าเช่า4500ทุกเดือน  → จ่าย 4,500 + เสนอตั้งเป็นรายการประจำ
 ```
 
-ตัวอย่างด้านบนมาจาก AI/ทีม จึง **ไม่นับเป็น corpus จริง** ก่อนปล่อยต้องมีอย่างน้อย
-**20 ประโยคจริงแบบ verbatim** จากกลุ่มเป้าหมายหรือการจดใช้จริง (ลบ PII ได้ แต่ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
-parser เป็นตัวเพิ่มความสะดวก ไม่ใช่จุดขาย จึงลดพื้นที่ปัญหาเริ่มต้น แต่ไม่ลดเกณฑ์ความถูกต้อง
+ตัวอย่างด้านบนเป็นชุดสังเคราะห์ที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้ว จึงใช้เป็น regression gate ได้
+แต่ **ห้ามเรียกผลว่า accuracy ผู้ใช้จริง** parser เป็นตัวเพิ่มความสะดวก ไม่ใช่จุดขาย
 
-หลังปล่อย corpus ต้องโตจากข้อความจริงที่ได้ tier `low`/`reject` หรือถูกผู้ใช้แก้หลังบันทึก
-ผ่าน event tracking รอบ 14 และให้ยกเกณฑ์ accuracy ขึ้นเมื่อ corpus โต ห้ามลด threshold เพื่อทำให้เทสผ่าน
+หลังปล่อยให้สะสมข้อความจริงจาก event tracking รอบ 14 เมื่อครบอย่างน้อย **50 ประโยคจริง**
+จึงวัด user accuracy ใน fixture แยกและเทียบกับ synthetic regression; ให้ยกเกณฑ์เมื่อ corpus จริงโต
+ห้ามลด threshold เพื่อทำให้เทสผ่าน
 
-**เกณฑ์คุณภาพที่ต้องผ่านก่อนปล่อย:** accuracy ของ *จำนวนเงิน* ≥ 98% (ผิดเรื่องเงินคือบาปที่ให้อภัยไม่ได้) ·
-accuracy ของ *ประเภท* ≥ 95% · *หมวดหมู่* ≥ 80% (แก้ง่าย ผิดได้บ้าง) ·
+**เกณฑ์ synthetic regression:** accuracy ของ *จำนวนเงิน* ≥ 98% (ผิดเรื่องเงินคือบาปที่ให้อภัยไม่ได้) ·
+*ประเภท* ≥ 95% · *หมวดหมู่* ≥ 80% (แก้ง่าย ผิดได้บ้าง) ·
 และ **อัตราการบันทึกผิดโดยผู้ใช้ไม่รู้ตัวต้องเป็น 0** — กำกวมเมื่อไหร่ให้ถาม ห้ามเดา
 
 ### กฎทางบัญชีภายในแอป
@@ -538,7 +538,7 @@ LINE integration · OCR สลิปอัตโนมัติ · โหมด�
 
 **Activation:** สร้างเป้าหมายแรกสำเร็จ · บันทึกรายการแรกใน session แรก · ใช้ conversational input สำเร็จโดยไม่ต้องแก้ (%)
 **Retention:** D1/D7/D30 · จำนวนวันที่บันทึกต่อสัปดาห์ · % ที่เปิด weekly review · % ที่ทำตาม Recovery Plan
-**Quality:** parser accuracy แยกรายฟิลด์ · correction rate หลังบันทึก · duplicate rate · notification opt-out rate
+**Quality:** synthetic regression accuracy แยกรายฟิลด์ · user accuracy เมื่อข้อความจริง ≥50 · correction rate หลังบันทึก · duplicate rate · notification opt-out rate
 **Outcome:** เป้าหมายที่มี progress ต่อเนื่อง · อัตราถึง milestone · % ที่กลับมาออมหลังหลุดแผน
 
 ### Gate 1 — หลัง Phase 1 (สมมติฐาน ปรับได้ตามบริบทจริง)
@@ -546,7 +546,7 @@ LINE integration · OCR สลิปอัตโนมัติ · โหมด�
 ไปต่อ Phase 2 เมื่อ:
 
 - W4 logging retention ≥ 25%
-- parser accuracy ของจำนวนเงิน ≥ 98% และ correction rate ≤ 20%
+- parser user accuracy ของจำนวนเงิน ≥ 98% เมื่อมีข้อความจริง ≥50; ระหว่างที่ยังไม่ครบให้รายงานเฉพาะ synthetic regression แยกต่างหาก · correction rate ≤ 20%
 - ≥ 40% ของผู้ใช้ที่ยังอยู่ เปิด weekly review อย่างน้อย 2 ครั้ง
 
 ถ้า W4 < 15% → **หยุด** อย่าเพิ่มฟีเจอร์ ให้กลับไปคุยกับผู้ใช้ว่าทำไมไม่กลับมา
@@ -586,7 +586,7 @@ W8 retention ≥ 15% · มีผู้ใช้ ≥ 50 คนที่ใช้
 6. อะไรใน backlog ปัจจุบันที่ควร **ตัดทิ้งถาวร** ไม่ใช่แค่เลื่อน
 7. หลักการออกแบบ §6 มีข้อไหนที่ขัดกันเองหรือจะพาไปผิดทาง
 
-### รอบ B — Parser (implementation รอบแรกเสร็จ; ข้าม design ตั้งต้นได้ แต่ corpus จริงขั้นต่ำ 20 ประโยคยังไม่ครบ)
+### รอบ B — Parser (implementation + synthetic regression เสร็จ; user accuracy รอข้อความจริง ≥50 หลังรอบ 14)
 
 8. deterministic / LLM / hybrid — แบ่งความรับผิดชอบอย่างไร และ LLM คุ้มเมื่อไร
 9. เกณฑ์ accuracy ที่ตั้งไว้ (98/95/80) สมจริงกับภาษาไทยที่ไม่เว้นวรรคไหม

@@ -82,7 +82,8 @@ test/
 ├─ transaction_flow_test.dart   flow + source/destination + legacy edit guard
 ├─ invariants/transaction_flow_invariant_test.dart  I13 canonical TxType/flow
 ├─ invariants/migration_chain_invariant_test.dart  I14 full-chain + TOTAL
-├─ parser_test.dart          corpus accuracy + parser edge cases
+├─ parser_test.dart          synthetic regression accuracy 98/95/80 + silent-high=0
+├─ parser_edge_cases_test.dart  structural regression 70 เคส
 ├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
 ├─ notification_schedule_test.dart / notification_controller_test.dart
 ├─ notification_ui_test.dart       schedule, permission-on-first-save, Settings/web stub
@@ -91,8 +92,9 @@ test/
 ├─ weekly_review_test.dart          pure report/period/projection/expense-goal connector
 ├─ weekly_review_widget_test.dart   Dashboard launcher/history/disclaimer/quest progress
 ├─ historical_edit_test.dart       edit/delete history + ledger
-└─ fixtures/parser_corpus.dart     corpus synthetic 37 ประโยค (ยังไม่ใช่ข้อมูลผู้ใช้จริง;
-                                    support file ไม่ใช่ test entrypoint)
+├─ fixtures/parser_corpus.dart     synthetic 37 ประโยคที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้ว;
+│                                  ใช้ regression gate แต่ห้ามเรียก accuracy ผู้ใช้จริง
+└─ fixtures/parser_edge_cases.dart structural synthetic 70 เคส (66 บังคับ + 4 known limitation)
 ```
 
 **หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 850 บรรทัดแม้แยก conversational และ
@@ -173,6 +175,7 @@ quick-entry action เป็น part แล้ว; `models.dart` ยังรว
 - field ปัจจุบันคือ `amountSatang`, `targetSatang`, `currentSatang`, `unallocatedSatang` และ `overflowSatang`
 - Input เงินต้องผ่าน `parseMoneyToSatang()` ตั้งแต่จุดรับค่า และต้องไม่ติดลบ/ไม่เกิน **฿100,000,000 ต่อรายการ** (`10,000,000,000` สตางค์)
 - กฎปัดเศษเดียวทั้ง input และ migration v1→v2 คือ **ปัดครึ่งขึ้น (half-up)**: อ่านทศนิยมบาทหลักที่ 3 ถ้า `>= 5` ให้เพิ่ม 1 สตางค์ เช่น `1.004 → 100`, `1.005 → 101`, `2.675 → 268` สตางค์ โดยห้ามคำนวณผ่าน floating point
+- parser operator `หาร N` คำนวณจากจำนวนเต็มสตางค์และปัดเศษผลหารเป็นสตางค์ด้วย half-up เช่น `100 บาท หาร 3 → 3,333 สตางค์`; ห้ามแปลงผ่าน `double`
 - migration v1→v2 แปลง field เงินหน่วยบาทเดิมทุกตำแหน่งเป็น field `...Satang`; ข้อมูลที่ไม่มี `schemaVersion` ถือเป็น v1 และต้องเปิดใช้ได้โดยยอดไม่เปลี่ยน
 - `Goal.flexible == true` คือกระเป๋าไม่มีเป้าหมาย: รับเงินได้ไม่จำกัด, ไม่มี overflow, progress/remaining ไม่ใช้เป็นความจุ, ไม่ได้ milestone EXP และไม่มีสถานะ completed; UI ต้องแสดง "ยอดสะสม" แทนเปอร์เซ็นต์
 
@@ -255,8 +258,8 @@ Workflow: `.github/workflows/definition-of-done.yml` ใช้ Flutter 3.47.1 �
 - ❌ **ห้ามใส่ข้อมูล mock/seed กลับเข้าไปในแอป** — แอปต้องเริ่มว่างเปล่าผ่าน onboarding เสมอ
 - ❌ **ห้ามใช้ `double` กับยอดเงิน**
 - ❌ **logic ใหม่ทุกตัวใน Phase 1 ต้องเป็น pure function ใน `lib/utils/`** และต้องเทสได้โดยไม่สร้าง `AppState`; `AppState` มีหน้าที่ validate/orchestrate/apply/persist เท่านั้น ห้ามเพิ่มสูตรคำนวณใน `AppState` หรือคลาส widget แม้แต่บรรทัดเดียว
-- ❌ **ห้ามนับตัวอย่างที่ AI หรือทีมแต่งเองเป็น parser corpus จริง** — ก่อนเริ่มรอบ 9 ต้องมีอย่างน้อย 20 ประโยคจริง เพราะ parser เป็นตัวเพิ่มความสะดวก ไม่ใช่จุดขาย และพื้นที่ปัญหาถูกลดให้เล็กลง; ข้อความต้องมาจากกลุ่มเป้าหมายหรือการจดใช้จริงแบบ verbatim (ลบ PII ได้ แต่ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
-- หลังปล่อยให้เพิ่ม corpus จากข้อความจริงที่ได้ tier `low`/`reject` หรือถูกผู้ใช้แก้หลังบันทึก และยกเกณฑ์ accuracy ขึ้นเมื่อ corpus โต ห้ามลด threshold เพื่อทำให้เทสผ่าน
+- ❌ **ห้ามเรียกผลจากตัวอย่างที่ AI/ทีมแต่งว่า accuracy ผู้ใช้จริง** — ชุดสังเคราะห์ที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้วใช้เป็น regression gate 98/95/80 ได้ แต่ต้องรายงานชื่อว่า `synthetic regression accuracy` เท่านั้น
+- accuracy ผู้ใช้จริงเริ่มวัดเมื่อมีข้อความผู้ใช้จริงอย่างน้อย 50 ประโยคจาก event tracking รอบ 14; เก็บ fixture แยกจาก synthetic, เทียบผลสองชุด และยกเกณฑ์เมื่อ corpus จริงโต ห้ามลด threshold เพื่อทำให้เทสผ่าน
 - ❌ **ห้ามลบหรือลดความชัดของข้อความ disclaimer / label "จำลอง"** บนฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก (§1 และ `simulation_notice.dart`)
 - ❌ ห้าม refactor ใหญ่พ่วงมากับงานฟีเจอร์ — แยกคนละรอบ
 - ❌ ห้าม commit ไฟล์ signing key, `.env`, หรือ google-services.json ที่มี secret
@@ -327,7 +330,8 @@ void someAction(...) {
 ## 10. Backlog
 
 ### P0 — ต้องเสร็จก่อนปล่อยผู้ใช้จริง
-- [ ] ก่อนเริ่มรอบ 9 ต้องมี parser corpus อย่างน้อย 20 ประโยคจริง เพราะ parser ไม่ใช่จุดขายและพื้นที่ปัญหาถูกลดให้เล็กลง; synthetic 37 เคสเดิมใช้ regression ได้แต่ไม่นับรวมขั้นต่ำ และห้ามให้ AI แต่งเพื่อดันจำนวน
+- [x] parser synthetic regression: corpus 37 ประโยคที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้ว + structural edge cases 70 เคส; gate 98/95/80 และ silent-high error = 0
+- [ ] หลังรอบ 14 สะสมข้อความผู้ใช้จริงอย่างน้อย 50 ประโยคแล้ววัด user accuracy แยก fixture พร้อมเทียบกับ synthetic regression; ก่อนครบห้ามอ้างว่าเป็น accuracy ผู้ใช้จริง
 - [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v5)
 - [x] เปลี่ยนยอดเงินเป็น `int` สตางค์ + migration v1→v2
 - [x] Export / Import ข้อมูลเป็นไฟล์ JSON พร้อม validate, migration, preview และ pre-import backup

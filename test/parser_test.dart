@@ -11,8 +11,8 @@ const _minimumCategoryAccuracy = 0.80;
 final _referenceDate = DateTime.utc(2026, 8, 27);
 
 void main() {
-  group('ThaiLedgerParser corpus', () {
-    test('ผ่าน corpus พร้อมรายงาน accuracy แยกรายฟิลด์', () {
+  group('ThaiLedgerParser synthetic regression corpus', () {
+    test('ผ่าน regression gate พร้อมรายงาน accuracy แยกรายฟิลด์', () {
       var amountCorrect = 0;
       var amountTotal = 0;
       var typeCorrect = 0;
@@ -101,7 +101,7 @@ void main() {
 
       // ignore: avoid_print
       print(
-        'PARSER_ACCURACY '
+        'PARSER_SYNTHETIC_REGRESSION_ACCURACY '
         'amount=${_percent(amountAccuracy)} ($amountCorrect/$amountTotal) '
         'type=${_percent(typeAccuracy)} ($typeCorrect/$typeTotal) '
         'category=${_percent(categoryAccuracy)} ($categoryCorrect/$categoryTotal) '
@@ -136,17 +136,16 @@ void main() {
     });
 
     test('normalize สัญลักษณ์เงิน alias และคำจำนวนทุกระดับ', () {
-      final cases = <String, int>{
+      final highCases = <String, int>{
         'กาแฟ ฿65': 6500,
         'กาแฟ 65 บ.': 6500,
-        'เซเวน 89 บาท': 8900,
         'ขายของได้ 2พัน': 200000,
         'เงินเดือน 3 หมื่น': 3000000,
         'ขายของได้ 4แสน': 40000000,
         'ขายของได้ 1 ล้าน': 100000000,
       };
 
-      for (final entry in cases.entries) {
+      for (final entry in highCases.entries) {
         final result = parseThaiLedgerLine(
           entry.key,
           referenceDate: _referenceDate,
@@ -155,6 +154,13 @@ void main() {
             reason: entry.key);
         expect(result.tier, ParseTier.high, reason: entry.key);
       }
+
+      final commonMisspelling = parseThaiLedgerLine(
+        'เซเวน 89 บาท',
+        referenceDate: _referenceDate,
+      );
+      expect(commonMisspelling.items.single.amountSatang, 8900);
+      expect(commonMisspelling.tier, ParseTier.medium);
     });
 
     test('เข้าเป้าหมายถามชื่อกระปุกเมื่อ caller ส่งมาหลายตัวเลือก', () {

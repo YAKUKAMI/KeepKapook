@@ -1,5 +1,10 @@
 import 'package:keepkapook/utils/parser/parser.dart';
 
+// ชุดสังเคราะห์ที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้ว ใช้เป็น regression gate
+// เท่านั้น ห้ามรายงานผลจากไฟล์นี้ว่าเป็น accuracy กับผู้ใช้จริง
+// accuracy ผู้ใช้จริงต้องวัดจากข้อความผู้ใช้จริงอย่างน้อย 50 ประโยค
+// ซึ่งจะเก็บแยกหลังมี event tracking รอบ 14
+
 class ExpectedParserItem {
   const ExpectedParserItem(
     this.amountSatang,
@@ -116,16 +121,16 @@ const parserCorpus = <ParserCorpusCase>[
       expectedItems: [ExpectedParserItem(50000, income, 'ค่าขนม')]),
   ParserCorpusCase(
       input: 'ชานม 45x2',
-      expectedTier: ParseTier.high,
+      expectedTier: ParseTier.medium,
       expectedItems: [ExpectedParserItem(9000, expense, 'อาหาร')]),
   ParserCorpusCase(
       input: 'หมูกระทะ 350 หาร 4',
-      expectedTier: ParseTier.high,
+      expectedTier: ParseTier.medium,
       expectedItems: [ExpectedParserItem(8750, expense, 'อาหาร')]),
   ParserCorpusCase(
       input: 'ซื้อเสื้อ 590 ลดเหลือ 490',
-      expectedTier: ParseTier.high,
-      expectedItems: [ExpectedParserItem(49000, expense, 'ของใช้')]),
+      expectedTier: ParseTier.medium,
+      expectedItems: [ExpectedParserItem(49000, expense, 'เสื้อผ้า')]),
 
   // วันที่
   ParserCorpusCase(
@@ -193,17 +198,17 @@ const parserCorpus = <ParserCorpusCase>[
   ParserCorpusCase(input: 'ข้าว', expectedTier: ParseTier.reject),
   ParserCorpusCase(
       input: '150',
-      expectedTier: ParseTier.low,
+      expectedTier: ParseTier.reject,
       expectedDetectedAmounts: [15000]),
   ParserCorpusCase(input: 'กาแฟ -50', expectedTier: ParseTier.reject),
 
   // ซับซ้อน — parser v1 รองรับทั้งสองเคส จึงไม่ต้อง mark known limitation
   ParserCorpusCase(
       input: 'กินหมูกระทะกับเพื่อน 350 แต่จ่ายไป 100',
-      expectedTier: ParseTier.high,
+      expectedTier: ParseTier.medium,
       expectedItems: [ExpectedParserItem(10000, expense, 'อาหาร')]),
   ParserCorpusCase(
       input: 'จ่ายค่าเช่า4500ทุกเดือน',
-      expectedTier: ParseTier.high,
+      expectedTier: ParseTier.medium,
       expectedItems: [ExpectedParserItem(450000, expense, 'ที่พัก')]),
 ];

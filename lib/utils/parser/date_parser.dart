@@ -58,7 +58,7 @@ ParsedDate parseLedgerDate(String input, DateTime referenceDate) {
       if (daysBack == 0) daysBack = 7;
       return ParsedDate(
         value: today.subtract(Duration(days: daysBack)),
-        confidence: 0.95,
+        confidence: 0.65,
         explicit: true,
       );
     }

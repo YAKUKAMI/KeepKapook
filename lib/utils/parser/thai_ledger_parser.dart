@@ -74,6 +74,15 @@ ParseResult parseThaiLedgerLine(
       date,
     );
   }
+  if (RegExp(r'^-?\d+(?:\.\d+)?$').hasMatch(normalized)) {
+    return _reject(
+      input,
+      normalized,
+      detected,
+      'กรุณาใส่คำอธิบายรายการพร้อมจำนวนเงิน',
+      date,
+    );
+  }
 
   final ambiguity = _ambiguityFor(normalized);
   if (ambiguity != null) {
@@ -112,6 +121,7 @@ ParseResult parseThaiLedgerLine(
       amountSatang: resolved.amountSatang!,
       date: date,
       availableGoalNames: availableGoalNames,
+      forceMedium: resolved.requiresReview || normalized.contains('ทุกเดือน'),
     );
   }
 
@@ -142,6 +152,7 @@ ParseResult _singleItemResult({
   required int amountSatang,
   required ParsedDate date,
   required List<String> availableGoalNames,
+  bool forceMedium = false,
 }) {
   if (amountSatang <= 0) {
     return _reject(
@@ -227,7 +238,7 @@ ParseResult _singleItemResult({
     items: [item],
     detectedAmounts: detected,
     confidence: confidence,
-    tier: _tierFor(confidence),
+    tier: _capAtMedium(_tierFor(confidence), forceMedium: forceMedium),
   );
 }
 
@@ -309,7 +320,10 @@ _ResolvedAmount _resolveOperator(
       return const _ResolvedAmount(
           error: 'ไม่แน่ใจว่ายอดหลังลดเหลือคือจำนวนใด');
     }
-    return _ResolvedAmount(amountSatang: finalAmounts.single.amountSatang);
+    return _ResolvedAmount(
+      amountSatang: finalAmounts.single.amountSatang,
+      requiresReview: true,
+    );
   }
 
   final paidAt = normalized.lastIndexOf('จ่ายไป');
@@ -318,7 +332,10 @@ _ResolvedAmount _resolveOperator(
         .where((amount) => amount.start > paidAt)
         .toList(growable: false);
     if (paidAmounts.length == 1) {
-      return _ResolvedAmount(amountSatang: paidAmounts.single.amountSatang);
+      return _ResolvedAmount(
+        amountSatang: paidAmounts.single.amountSatang,
+        requiresReview: true,
+      );
     }
     return const _ResolvedAmount(error: 'ไม่แน่ใจว่ายอดที่จ่ายจริงคือจำนวนใด');
   }
@@ -334,7 +351,10 @@ _ResolvedAmount _resolveOperator(
     if (result > BigInt.from(maxMoneyInputSatang)) {
       return const _ResolvedAmount(error: 'ยอดหลังคูณเกิน 100,000,000 บาท');
     }
-    return _ResolvedAmount(amountSatang: result.toInt());
+    return _ResolvedAmount(
+      amountSatang: result.toInt(),
+      requiresReview: true,
+    );
   }
 
   final divide = RegExp(r'หาร\s*(\d+)').firstMatch(normalized);
@@ -346,6 +366,7 @@ _ResolvedAmount _resolveOperator(
     }
     return _ResolvedAmount(
       amountSatang: _divideHalfUp(base.amountSatang!, divisor),
+      requiresReview: true,
     );
   }
 
@@ -379,7 +400,7 @@ _Classification _classify(String input) {
   ParsedEntryType? type;
   var typeConfidence = 0.2;
   for (final rule in typeKeywordRules) {
-    if (rule.keywords.any(input.contains)) {
+    if (rule.matches(input)) {
       type = rule.value;
       typeConfidence = 1;
       break;
@@ -388,7 +409,7 @@ _Classification _classify(String input) {
 
   CategoryRule? matchedCategory;
   for (final rule in categoryKeywordRules) {
-    if (rule.keywords.any(input.contains)) {
+    if (rule.matches(input)) {
       matchedCategory = rule;
       break;
     }
@@ -402,15 +423,16 @@ _Classification _classify(String input) {
     type: type,
     category: matchedCategory?.category,
     typeConfidence: typeConfidence,
-    categoryConfidence: matchedCategory == null ? 0.2 : 0.98,
+    categoryConfidence: matchedCategory?.confidence ?? 0.2,
   );
 }
 
 ParseQuestion? _ambiguityFor(String input) {
-  final hasClearGoal = typeKeywordRules.first.keywords.any(input.contains);
+  final hasClearGoal = typeKeywordRules.first.matches(input);
   if (input.contains('โอน') && !hasClearGoal) return transferQuestion;
   if (input.contains('คืนเงินเพื่อน')) return repaymentQuestion;
   if (input.contains('ยืมเพื่อน')) return lendingQuestion;
+  if (input.contains('จ่ายแทนเพื่อน')) return frontedPaymentQuestion;
   return null;
 }
 
@@ -436,6 +458,11 @@ ParseTier _tierFor(FieldConfidence confidence) {
     return ParseTier.medium;
   }
   return ParseTier.low;
+}
+
+ParseTier _capAtMedium(ParseTier tier, {required bool forceMedium}) {
+  if (forceMedium && tier == ParseTier.high) return ParseTier.medium;
+  return tier;
 }
 
 String _descriptionFrom(String input) {
@@ -491,8 +518,13 @@ class _Classification {
 }
 
 class _ResolvedAmount {
-  const _ResolvedAmount({this.amountSatang, this.error});
+  const _ResolvedAmount({
+    this.amountSatang,
+    this.error,
+    this.requiresReview = false,
+  });
 
   final int? amountSatang;
   final String? error;
+  final bool requiresReview;
 }
