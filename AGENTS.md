@@ -46,6 +46,7 @@ lib/
 ├─ state/app_state.dart      AppState (ChangeNotifier): action หลัก + persist + _initEmpty()
 ├─ state/conversational_entries.dart  part: save/undo + แก้ไข/ลบประวัติ
 ├─ state/quick_entries.dart  part: ออม/รายจ่ายเร็ว + snapshot undo ทั้ง state
+├─ state/weekly_reviews.dart part: weekly report orchestration + quest completion
 ├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3→v4→v5)
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
@@ -53,8 +54,9 @@ lib/
 ├─ services/quick_entry/    controller + SharedPreferences ของจำนวนลัด/หมวดล่าสุด
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
 ├─ utils/financial_summary.dart  pure summaries: goal totals/progress, monthly ledger,
-│                            7-day saving series (รับ `now` จาก caller)
+│                            7-day saving series + period/category/goal-pace/expense-goal metrics
 ├─ utils/habit_streak.dart   pure local-day/streak/grace/calendar/reward summaries
+├─ utils/weekly_review.dart  pure weekly report + first-week/weekly period history
 ├─ utils/notification_schedule.dart  pure daily/weekly schedule + reminder copy
 ├─ utils/quick_entry.dart    pure preset validation + goal selection + feedback progress
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
@@ -65,7 +67,7 @@ lib/
 │                            quick_amount_settings
 └─ screens/                  dashboard, goals, goal_detail, new_goal, add_saving,
                              scan_slip, quests, achievements, history, unallocated,
-                             settings, ledger, onboarding
+                             settings, ledger, onboarding, weekly_review
 test/
 ├─ fixtures/schema/v1.json ... v4.json  state จริงของทุก schema เก่าสำหรับ I14
 ├─ smoke_test.dart           boot→onboarding + ทุกหน้าจอ build ไม่ crash
@@ -86,6 +88,8 @@ test/
 ├─ notification_ui_test.dart       schedule, permission-on-first-save, Settings/web stub
 ├─ quick_entry_rules_test.dart      pure preset/goal-selection/feedback rules
 ├─ quick_record_test.dart           quick saving/expense/undo/Settings/category memory
+├─ weekly_review_test.dart          pure report/period/projection/expense-goal connector
+├─ weekly_review_widget_test.dart   Dashboard launcher/history/disclaimer/quest progress
 ├─ historical_edit_test.dart       edit/delete history + ledger
 └─ fixtures/parser_corpus.dart     corpus synthetic 37 ประโยค (ยังไม่ใช่ข้อมูลผู้ใช้จริง;
                                     support file ไม่ใช่ test entrypoint)
@@ -186,6 +190,7 @@ quick-entry action เป็น part แล้ว; `models.dart` ยังรว
 - ฟีเจอร์ที่ผูกกับวัน: กราฟ 7 วัน, streak, ล็อกเงิน 7/30/90 วัน, quest รายวัน
 - streak คำนวณจาก timestamp ของ ledger และ `externalIn` ที่เข้า goal ผ่าน `habit_streak.dart`; grace day รักษาจำนวนเดิมแต่ไม่นับวันที่ขาดเพิ่ม และไม่มี cache/field persistence จึงไม่ต้อง bump schema
 - local notification ใช้เวลา Asia/Bangkok จาก `notification_schedule.dart`: รายวันค่าเริ่มต้น 20:00 และสรุปวันจันทร์ 09:00; ใช้ schedule id คงที่ประเภทละหนึ่ง id เพื่อไม่ให้ตั้งซ้ำ
+- weekly review ใช้ช่วง `[start, end)` ตามวันไทยจาก `habit_streak.dart`, รับเวลา `asOf` จาก caller, สร้าง first-week review เมื่อครบวันที่ 7 และรายงานสัปดาห์จันทร์-อาทิตย์ย้อนหลังโดยไม่ persist snapshot; วันเริ่มใช้งานอนุมานจาก `Goal.startDate`/รายการแรกเพราะ onboarding สร้าง goal แรกทันที
 - ล็อกเงินต้องเทียบกับ `unlockAt` ที่บันทึกไว้ ไม่ใช่นับถอยหลังจากเวลาปัจจุบัน (กันผู้ใช้หมุนนาฬิกาเครื่อง)
 - **สถานะโค้ดปัจจุบันยังไม่ทำตามกฎนี้ครบ:** timestamp บาง action ยังสร้างจาก local `DateTime.now()`; สูตรกราฟ 7 วันอยู่ใน `financial_summary.dart`, รับ `now` และนับเฉพาะ `externalIn` แล้ว แต่ยังเทียบ `t.date` ตรงๆ โดยไม่แปลง timezone
 
@@ -206,7 +211,8 @@ quick-entry action เป็น part แล้ว; `models.dart` ยังรว
 - **Streak + ปฏิทิน:** current/longest streak, ผ่อนผัน 1 วัน, ปฏิทินเดือนและรายการรายวันบน Dashboard; คำนวณใหม่จากประวัติ ไม่หัก EXP เมื่อขาด
 - **Local notification:** เตือนบันทึกประจำวัน + ดูสรุปเช้าวันจันทร์ ปรับเวลา/ปิดแยกได้, ขอสิทธิ์หลังบันทึกแรก, ทำงานในเครื่อง; web ใช้ stub และซ่อนเมนู
 - **Quick Record:** FAB + Dashboard เข้าถึงออมเร็ว/รายจ่ายเร็วได้โดยไม่เปลี่ยนแท็บ, จำนวนลัด 20/50/100 แก้ได้ใน Settings, จำหมวดรายจ่ายล่าสุด, แสดง progress/ยอดเดือนทันที และ undo ทั้ง state ภายใน 5 วินาที
-- quest ปัจจุบันมี `q-deposit`, `q-allocate`, `q-weekly-consistency` พร้อม event handler; badge default 5 ตัวรวม `b-rhythm` มีเงื่อนไขครบ ส่วน `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
+- **Weekly Review:** first-week วันที่ 7 + รอบจันทร์-อาทิตย์ย้อนหลัง, สรุปวันบันทึก/streak/ออม/รายจ่าย/หมวด/วันถึงเป้า และเชื่อมส่วนต่างรายจ่ายจริงกับวันที่ถึงเป้า; สูตรอยู่ใน pure utils และไม่เก็บ snapshot
+- quest ปัจจุบันมี `q-deposit`, `q-allocate`, `q-weekly-consistency`, `q-weekly-review` พร้อม event handler; badge default 5 ตัวรวม `b-rhythm` มีเงื่อนไขครบ ส่วน `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
 
 ---
 
@@ -338,15 +344,15 @@ void someAction(...) {
 - [x] **Streak + ปฏิทินการออม** — current/longest + grace 1 วัน + ดูรายการตามวันบน Dashboard
 - [x] **Local notification เตือนออม** (`flutter_local_notifications`, ทำงาน offline) — รายวัน + สรุปวันจันทร์, conditional mobile/web stub
 - [ ] **แก้ไขเป้าหมาย** — ส่วนแก้/ลบรายการย้อนหลังและ undo ของ conversational entry ทำแล้ว
-- [ ] **Insight รายจ่ายที่แปลงเป็นเวลา** — ไม่ใช่แค่ pie chart แต่ "ลดกาแฟสัปดาห์ละ 2 แก้ว = ถึงเป้าเร็วขึ้น 12 วัน" ← จุดที่ MAKE ไม่ทำ
+- [x] **Insight รายจ่ายที่แปลงเป็นเวลา** — Weekly Review ใช้เฉพาะส่วนต่างจากสัปดาห์ก่อนที่วัดได้จริง แล้วบอกผลต่อวันถึงเป้า; ข้อมูลไม่พอ/ผลต่ำกว่า 1 วันไม่แสดง
 - [ ] **Challenge การออม** — ออม 365 วันทวีคูณ / สัปดาห์ไม่ใช้เงิน / เก็บเศษสตางค์ (ต่อยอด quest+badge ที่มีอยู่)
-- [ ] **สรุปรายสัปดาห์-เดือน แชร์เป็นรูป** — growth loop ที่ไม่ต้องซื้อโฆษณา
+- [ ] **สรุปรายเดือน + แชร์เป็นรูป** — Weekly Review และประวัติรายสัปดาห์ทำแล้ว; monthly/shareable card ยังไม่ทำ
 - [x] debounce 300ms + ordered write queue + error reporting ใน `_save()`
 - [x] CI (GitHub Actions): fatal analyze + test + build web ทุก PR (`.github/workflows/definition-of-done.yml`)
 - [x] แยก flexible pocket ให้รับเงินไม่จำกัด ไม่มี overflow/progress/milestone/completed
 - [x] แก้กราฟ 7 วันและค่าเฉลี่ยเงินออมให้นับจาก `TransactionFlow.externalIn`
 - [x] `q-allocate` มี handler จาก event จัดสรรจริง และไม่แจก base/milestone EXP ซ้ำ
-- [ ] คืน `q-weekly-review` ในรอบ 12 เมื่อ Weekly Review มี completion event และเทส progress จริง (ถอนจาก default/state ที่ยังไม่สำเร็จใน schema v5)
+- [x] คืน `q-weekly-review` ในรอบ 12 พร้อม completion event ตอนเปิดรายงานและ I11 handler
 - [x] คืน `q-weekly-consistency` เมื่อระบบ streak มี event source และเทส progress จริง
 - [x] คืน `b-rhythm` เมื่อ streak 7 วัน unlock ได้จริง; badge ที่เคย unlock ยังคงอยู่
 - [ ] พิจารณา `b-memory` ใหม่เมื่อมี Album subsystem ที่อนุมัติเข้าแผนหลัง Phase 2 และมี unlock event/test; ตอนนี้ลบจาก default และถอนเฉพาะตัวที่ยังไม่ unlock ใน schema v5

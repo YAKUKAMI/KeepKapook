@@ -13,23 +13,27 @@ import 'goal_detail_screen.dart';
 import 'add_saving_screen.dart';
 import 'scan_slip_screen.dart';
 import 'ledger_screen.dart';
+import 'weekly_review_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.now});
+
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final lp = levelProgress(app.user.exp);
-    final now = DateTime.now();
+    final currentTime = now ?? DateTime.now();
     final money = summarizeDashboardMoney(
       goals: app.goals,
       ledger: app.ledger,
       transactions: app.transactions,
-      now: now,
+      now: currentTime,
     );
     final habitEntries = app.habitEntries;
-    final habit = app.habitSummary(now: now);
+    final habit = app.habitSummary(now: currentTime);
+    final weeklyPeriods = app.weeklyReviewPeriods(now: currentTime);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -112,6 +116,50 @@ class DashboardScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
+        if (weeklyPeriods.isNotEmpty) ...[
+          InkWell(
+            key: const Key('weekly-review-launcher'),
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => WeeklyReviewScreen(now: currentTime),
+              ),
+            ),
+            child: _card(
+              gradient: const LinearGradient(
+                colors: [Color(0x26FFC857), Color(0x2652C7A5)],
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.auto_graph, color: AppColors.deepGreen),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'สรุปสัปดาห์พร้อมแล้ว',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'ดูจังหวะการบันทึก เป้าหมาย และรายงานย้อนหลัง',
+                          style: TextStyle(
+                            color: AppColors.mutedText,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: AppColors.deepGreen),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
         const QuickRecordLauncher(),
         const SizedBox(height: 12),
         const ConversationalEntryLauncher(),
@@ -120,7 +168,7 @@ class DashboardScreen extends StatelessWidget {
         HabitCalendarCard(
           summary: habit,
           entries: habitEntries,
-          today: now,
+          today: currentTime,
         ),
         const SizedBox(height: 16),
 

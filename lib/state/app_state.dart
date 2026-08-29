@@ -9,6 +9,7 @@ import '../utils/format.dart';
 import '../utils/habit_streak.dart';
 import '../utils/parser/parser.dart';
 import '../utils/quick_entry.dart';
+import '../utils/weekly_review.dart';
 import 'backup.dart';
 import 'domain_validation.dart';
 import 'migrations.dart';
@@ -17,6 +18,7 @@ export 'domain_validation.dart';
 
 part 'conversational_entries.dart';
 part 'quick_entries.dart';
+part 'weekly_reviews.dart';
 
 const appStateStorageKey = 'keepkapook_state_v1';
 const appStateCorruptBackupKey = '${appStateStorageKey}_corrupt_backup';
@@ -813,6 +815,13 @@ class AppState extends ChangeNotifier {
             period: 'weekly',
             target: 5,
             expReward: 40),
+        Quest(
+            id: 'q-weekly-review',
+            title: 'ทบทวนสัปดาห์',
+            description: 'เปิดดูสรุปสัปดาห์ล่าสุด',
+            period: 'weekly',
+            target: 1,
+            expReward: 25),
       ];
 
   List<AchievementBadge> _defaultBadges() => [
