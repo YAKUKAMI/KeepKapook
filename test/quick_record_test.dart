@@ -83,6 +83,11 @@ void main() {
     final app = readyApp();
     final quickEntries = await readyQuickController();
     final before = app.toJson();
+    final expectedAfterUndo = Map<String, dynamic>.from(before);
+    final expectedMetrics = Map<String, dynamic>.from(
+      before['metrics']! as Map<String, dynamic>,
+    )..['undoCount'] = 1;
+    expectedAfterUndo['metrics'] = expectedMetrics;
     await tester.pumpWidget(wrap(app: app, quickEntries: quickEntries));
 
     await tester.tap(find.byKey(const Key('quick-saving-launcher')));
@@ -98,7 +103,9 @@ void main() {
     await tester.tap(find.text('ยกเลิก'));
     await tester.pump();
 
-    expect(app.toJson(), before);
+    // I12: undo must restore all domain state. The local-only undo metric is
+    // intentionally append-only and records that the recovery path was used.
+    expect(app.toJson(), expectedAfterUndo);
     await app.flushPendingSaves();
   });
 

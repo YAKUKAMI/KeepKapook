@@ -48,12 +48,12 @@ lib/
 ├─ state/quick_entries.dart  part: ออม/รายจ่ายเร็ว + snapshot undo ทั้ง state
 ├─ state/next_goal_actions.dart part: orchestrate ข้อเสนอเป้าหมายถัดไปหลังฉลอง
 ├─ state/weekly_reviews.dart part: weekly report orchestration + quest completion
-├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3→v4→v5)
+├─ state/local_metrics_actions.dart part: orchestrate ตัวนับการใช้งานในเครื่อง
+├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3→v4→v5→v6)
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
 ├─ services/notifications/  controller + preference store + conditional mobile implementation/web stub
 ├─ services/quick_entry/    controller + SharedPreferences ของจำนวนลัด/หมวดล่าสุด
-├─ services/product_event_store.dart  local events ขั้นต่ำสำหรับ CTA เป้าหมายถัดไป
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
 ├─ utils/financial_summary.dart  pure summaries: goal totals/progress, monthly ledger,
 │                            7-day saving series + period/category/goal-pace/expense-goal metrics
@@ -62,18 +62,18 @@ lib/
 ├─ utils/notification_schedule.dart  pure daily/weekly schedule + reminder copy
 ├─ utils/quick_entry.dart    pure preset validation + goal selection + feedback progress
 ├─ utils/next_goal_offer.dart pure selector เป้าถัดไป + จำนวน unallocated ที่ย้ายได้
-├─ utils/product_events.dart pure event records + accepted/deferred summary
+├─ utils/local_metrics.dart  pure local counters + W4 retention + parser corpus policy
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
 ├─ utils/parser/             pure-Dart parser + models + dictionary
 ├─ widgets/                  goal_card, celebration, simulation_notice,
 │                            conversational_entry_sheet, habit_calendar_card,
 │                            notification_settings_card, quick_record_sheet,
-│                            quick_amount_settings
+│                            quick_amount_settings, local_metrics_card
 └─ screens/                  dashboard, goals, goal_detail, new_goal, add_saving,
                              scan_slip, quests, achievements, history, unallocated,
                              settings, ledger, onboarding, weekly_review
 test/
-├─ fixtures/schema/v1.json ... v4.json  state จริงของทุก schema เก่าสำหรับ I14
+├─ fixtures/schema/v1.json ... v5.json  state จริงของทุก schema เก่าสำหรับ I14
 ├─ smoke_test.dart           boot→onboarding + ทุกหน้าจอ build ไม่ crash
 ├─ models_serialization_test.dart
 ├─ migrations_test.dart
@@ -94,6 +94,9 @@ test/
 ├─ quick_record_test.dart           quick saving/expense/undo/Settings/category memory
 ├─ weekly_review_test.dart          pure report/period/projection/expense-goal connector
 ├─ weekly_review_widget_test.dart   Dashboard launcher/history/disclaimer/quest progress
+├─ local_metrics_test.dart          pure counters/W4/corpus/privacy/round-trip
+├─ local_metrics_migration_test.dart / local_metrics_state_test.dart
+├─ local_metrics_settings_test.dart Settings แสดงตัวเลข/สวิตช์/ล้าง corpus
 ├─ historical_edit_test.dart       edit/delete history + ledger
 └─ fixtures/parser_corpus.dart     corpus synthetic 37 ประโยค (ยังไม่ใช่ข้อมูลผู้ใช้จริง;
                                     support file ไม่ใช่ test entrypoint)
@@ -115,14 +118,14 @@ quick-entry action เป็น part แล้ว; `models.dart` ยังรว
 - Pre-import backup key: `keepkapook_state_v1_pre_import_backup` — เก็บ state ปัจจุบันก่อนกู้คืนทับทุกครั้ง
 - การตั้งค่า local notification ใช้ SharedPreferences keys prefix `keepkapook_notification_` แยกจาก state JSON; ไม่มีข้อมูลการเงินและไม่ทำให้ schemaVersion เปลี่ยน
 - การตั้งค่าบันทึกเร็วใช้ key `keepkapook_quick_saving_amounts_satang` และ `keepkapook_quick_expense_category` แยกจาก state JSON; ค่าเริ่มต้น 20/50/100 บาทถูกเก็บเป็น 2,000/5,000/10,000 สตางค์ และไม่ทำให้ schemaVersion เปลี่ยน
-- event ของ CTA เป้าหมายถัดไปใช้ key `keepkapook_product_events_v1` แยกจาก state JSON; เก็บเฉพาะชื่อ event, UTC timestamp และชนิดข้อเสนอ ไม่เก็บ goal id/ชื่อ/จำนวนเงิน และไม่ทำให้ schemaVersion เปลี่ยน (event tracking เต็มรูปแบบยังเป็นรอบ 14)
-- รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 5` และ migration framework ที่ `lib/state/migrations.dart`
+- ตัวนับการใช้งานอยู่ใน field `metrics` ของ state JSON ก้อนเดิม ไม่มี analytics SDK และไม่มีการส่งออกอัตโนมัติ; เก็บเฉพาะตัวนับ/วันที่ ส่วน parser corpus เก็บข้อความดิบเมื่อได้ `low`/`reject` หรือถูกแก้ พร้อมสวิตช์ปิดและปุ่มล้างใน Settings
+- รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 6` และ migration framework ที่ `lib/state/migrations.dart`
 
 ตัวอย่างย่อของ JSON ที่ persist จริงในปัจจุบัน:
 
 ```json
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "user": {"name": "...", "emoji": "🐷", "exp": 0,
     "consistencyWeeks": 0, "mode": "adult", "onboarded": true},
   "goals": [{
@@ -143,12 +146,18 @@ quick-entry action เป็น part แล้ว; `models.dart` ยังรว
   "quests": [{"id": "q-deposit", "title": "...", "description": "...", "period": "daily", "target": 1, "progress": 0, "expReward": 15, "claimed": false}],
   "badges": [{"id": "b-first-drop", "name": "...", "description": "...", "emoji": "💧", "condition": "...", "unlocked": false, "progress": 0.0}],
   "ledger": [{"id": "...", "type": "income", "amountSatang": 100000, "category": "อื่น ๆ", "note": "", "date": "2026-08-24T00:00:00.000"}],
+  "metrics": {"installedDay": "2026-08-24", "recordingDays": ["2026-08-24"],
+    "quickEntryTierCounts": {"high": 1, "medium": 0, "low": 0, "reject": 0},
+    "undoCount": 0, "correctionCount": 0, "weeklyReviewOpenCount": 0,
+    "recoveryPlanAcceptedCount": 0, "nextGoalOfferAcceptedCount": 0,
+    "nextGoalOfferDeferredCount": 0, "savingRecordCount": 1,
+    "expenseRecordCount": 0, "parserCorpusCollectionEnabled": true, "parserCorpus": []},
   "unallocatedSatang": 0
 }
 ```
 
 - สถานะการโหลดปัจจุบัน: ข้อมูลไม่มี `schemaVersion` ถือเป็น v1 แล้วเขียนกลับพร้อม version; ถ้า parse ไม่ผ่านหรือ version ใหม่กว่าแอป จะสำรอง raw JSON และแสดง `MaterialBanner` ภาษาไทยก่อนใช้ state ว่าง
-- ชื่อ key ลงท้าย `_v1` เป็นชื่อ storage key เดิมเพื่อรักษาความเข้ากันได้ ไม่ใช่เลข schema ปัจจุบัน; schema ใน JSON คือ v5
+- ชื่อ key ลงท้าย `_v1` เป็นชื่อ storage key เดิมเพื่อรักษาความเข้ากันได้ ไม่ใช่เลข schema ปัจจุบัน; schema ใน JSON คือ v6
 - **ทุกครั้งที่เพิ่ม/เปลี่ยน/ลบ field ใน model ต้องเพิ่ม `schemaVersion` และเขียน migration**
   ค่า version ปัจจุบันและ migration steps อยู่ใน `lib/state/migrations.dart`
 - ก่อน bump schema จาก vN เป็น vN+1 ต้องเพิ่ม fixture ของ vN ที่ `test/fixtures/schema/vN.json` เสมอ; I14 ต้อง migrate fixture ทุก version ถึง current schema โดยรักษา goal, transaction, EXP, unlocked badge และ TOTAL
@@ -159,6 +168,7 @@ quick-entry action เป็น part แล้ว; `models.dart` ยังรว
 - ข้อจำกัดของข้อมูล v2: allocate เคย persist เป็น `TxType.deposit` และ withdraw ไม่ได้ persist ค่า `toUnallocated`; migration จึง map flow ตาม `TxType` ที่เก็บไว้เท่านั้น (`deposit`→`externalIn`, `withdraw`→`externalOut`) และไม่เดาจากยอดหรือลำดับรายการ
 - migration v3→v4 canonicalize คู่ type/flow เดิม (`deposit/internal`→`allocate`, `withdraw/internal`→`deallocate`) และเติม `Goal.highestMilestonePercent` เพื่อกัน milestone EXP ซ้ำ โดยไม่แก้หรือลด `user.exp` เดิม
 - migration v4→v5 เติม `sourceGoalNameSnapshot`/`destinationGoalNameSnapshot` จาก goal ที่ยังอยู่, ถอน quest/badge ที่ไม่มี handler และคง retired badge ที่ unlock แล้ว โดยไม่แก้หรือลด `user.exp`
+- migration v5→v6 เพิ่ม local metrics: อนุมานวันติดตั้งจาก timestamp เก่าสุดที่มี, สร้างวันบันทึก/จำนวนการออม/รายจ่ายจากรายการเดิม และเริ่มตัวนับอื่นเป็นศูนย์; state ว่างที่ไม่มี timestamp ใช้วันที่ local ตอนโหลด
 - `note` ของ transaction ใหม่เป็นข้อความที่ผู้ใช้กรอกเท่านั้น ห้ามซ่อน source/destination หรือข้อมูลโครงสร้างไว้ในข้อความ
 
 ### กฎ Flow / EXP / Summary
@@ -261,8 +271,8 @@ Workflow: `.github/workflows/definition-of-done.yml` ใช้ Flutter 3.47.1 �
 - ❌ **ห้ามใส่ข้อมูล mock/seed กลับเข้าไปในแอป** — แอปต้องเริ่มว่างเปล่าผ่าน onboarding เสมอ
 - ❌ **ห้ามใช้ `double` กับยอดเงิน**
 - ❌ **logic ใหม่ทุกตัวใน Phase 1 ต้องเป็น pure function ใน `lib/utils/`** และต้องเทสได้โดยไม่สร้าง `AppState`; `AppState` มีหน้าที่ validate/orchestrate/apply/persist เท่านั้น ห้ามเพิ่มสูตรคำนวณใน `AppState` หรือคลาส widget แม้แต่บรรทัดเดียว
-- ❌ **ห้ามนับตัวอย่างที่ AI หรือทีมแต่งเองเป็น parser corpus จริง** — ก่อนเริ่มรอบ 9 ต้องมีอย่างน้อย 20 ประโยคจริง เพราะ parser เป็นตัวเพิ่มความสะดวก ไม่ใช่จุดขาย และพื้นที่ปัญหาถูกลดให้เล็กลง; ข้อความต้องมาจากกลุ่มเป้าหมายหรือการจดใช้จริงแบบ verbatim (ลบ PII ได้ แต่ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
-- หลังปล่อยให้เพิ่ม corpus จากข้อความจริงที่ได้ tier `low`/`reject` หรือถูกผู้ใช้แก้หลังบันทึก และยกเกณฑ์ accuracy ขึ้นเมื่อ corpus โต ห้ามลด threshold เพื่อทำให้เทสผ่าน
+- ❌ **ห้ามเรียกผลจาก synthetic corpus ว่า accuracy กับผู้ใช้จริง** — ประโยคสังเคราะห์ที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้วใช้เป็น regression gate 98/95/80 ได้ แต่ accuracy จริงวัดได้เมื่อสะสมข้อความ verbatim จากผู้ใช้จริงอย่างน้อย 50 ประโยค (ลบ PII ได้ ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
+- หลังปล่อยให้เพิ่ม corpus จากข้อความจริงที่ได้ tier `low`/`reject` หรือถูกผู้ใช้แก้หลังบันทึกผ่าน local metrics (ผู้ใช้ปิดหรือล้างได้) และวัด accuracy จริงใหม่เมื่อครบอย่างน้อย 50 ประโยค; ห้ามลด threshold เพื่อทำให้เทสผ่าน
 - ❌ **ห้ามลบหรือลดความชัดของข้อความ disclaimer / label "จำลอง"** บนฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก (§1 และ `simulation_notice.dart`)
 - ❌ ห้าม refactor ใหญ่พ่วงมากับงานฟีเจอร์ — แยกคนละรอบ
 - ❌ ห้าม commit ไฟล์ signing key, `.env`, หรือ google-services.json ที่มี secret
@@ -310,8 +320,8 @@ Workflow: `.github/workflows/definition-of-done.yml` ใช้ Flutter 3.47.1 �
 **เพิ่ม field ใน model**
 `models/models.dart` (ใส่ default ใน `fromJson`) → bump `schemaVersion` → เขียน migration → รันแอปด้วยข้อมูลเก่าดูว่าไม่พัง → unit test round-trip `toJson`/`fromJson`
 
-**เพิ่ม schema v6 (หรือ version ถัดไป)**
-เพิ่ม `currentSchemaVersion` ใน `state/migrations.dart` → เขียน `_migrateV5ToV6` → เพิ่ม `5: _migrateV5ToV6` ใน `_migrationSteps` (key คือ version ต้นทาง) → เขียน unit test migrate จาก v5 และทดสอบ migrate ต่อขั้นจาก v1 ถึง version ล่าสุด
+**เพิ่ม schema version ถัดไป**
+เพิ่ม `currentSchemaVersion` ใน `state/migrations.dart` → เขียน `_migrateVNToVNPlus1` → เพิ่ม step โดยใช้ version ต้นทางเป็น key → เพิ่ม fixture ของ current version ก่อน bump → เขียน unit test ของ step ใหม่และทดสอบ migrate ต่อขั้นจาก v1 ถึง version ล่าสุด
 
 **เพิ่ม quest หรือ badge**
 เพิ่ม definition + เงื่อนไข unlock (เป็น pure function) → unit test เงื่อนไข → เช็กว่า celebration dialog ไม่เด้งซ้ำ
@@ -333,8 +343,8 @@ void someAction(...) {
 ## 10. Backlog
 
 ### P0 — ต้องเสร็จก่อนปล่อยผู้ใช้จริง
-- [ ] ก่อนเริ่มรอบ 9 ต้องมี parser corpus อย่างน้อย 20 ประโยคจริง เพราะ parser ไม่ใช่จุดขายและพื้นที่ปัญหาถูกลดให้เล็กลง; synthetic 37 เคสเดิมใช้ regression ได้แต่ไม่นับรวมขั้นต่ำ และห้ามให้ AI แต่งเพื่อดันจำนวน
-- [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v5)
+- [ ] สะสม parser corpus แบบ verbatim จากผู้ใช้จริงอย่างน้อย 50 ประโยคแล้ววัด accuracy จริง; synthetic 37 เคสเดิมใช้ regression gate ได้แต่ห้ามเรียกว่า user accuracy
+- [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v6)
 - [x] เปลี่ยนยอดเงินเป็น `int` สตางค์ + migration v1→v2
 - [x] Export / Import ข้อมูลเป็นไฟล์ JSON พร้อม validate, migration, preview และ pre-import backup
 - [x] Disclaimer "ไม่ใช่แอปธนาคาร ไม่มีเงินจริง" ใน onboarding + Settings
@@ -355,6 +365,7 @@ void someAction(...) {
 - [ ] **สรุปรายเดือน + แชร์เป็นรูป** — Weekly Review และประวัติรายสัปดาห์ทำแล้ว; monthly/shareable card ยังไม่ทำ
 - [x] debounce 300ms + ordered write queue + error reporting ใน `_save()`
 - [x] CI (GitHub Actions): fatal analyze + test + build web ทุก PR (`.github/workflows/definition-of-done.yml`)
+- [x] Local metrics + W4 logging retention + parser corpus opt-out/clear/export (`schemaVersion` v6)
 - [x] แยก flexible pocket ให้รับเงินไม่จำกัด ไม่มี overflow/progress/milestone/completed
 - [x] แก้กราฟ 7 วันและค่าเฉลี่ยเงินออมให้นับจาก `TransactionFlow.externalIn`
 - [x] `q-allocate` มี handler จาก event จัดสรรจริง และไม่แจก base/milestone EXP ซ้ำ

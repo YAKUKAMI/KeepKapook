@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
-import '../services/product_event_store.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../utils/next_goal_offer.dart';
-import '../utils/product_events.dart';
 import '../widgets/celebration.dart';
 import 'new_goal_screen.dart';
 
@@ -146,10 +144,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
           offer.allocatableSatang,
           offer.goalId!,
         );
-        await _recordNextGoalDecision(
-          ProductEventName.nextGoalOfferAccepted,
-          offer,
-        );
+        _recordNextGoalDecision(accepted: true);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -163,10 +158,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
         Navigator.pop(context);
         return;
       case CelebrationNextAction.continueGoal:
-        await _recordNextGoalDecision(
-          ProductEventName.nextGoalOfferAccepted,
-          offer,
-        );
+        _recordNextGoalDecision(accepted: true);
         if (!mounted) return;
         await Navigator.pushReplacement(
           context,
@@ -176,10 +168,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
         );
         return;
       case CelebrationNextAction.createGoal:
-        await _recordNextGoalDecision(
-          ProductEventName.nextGoalOfferAccepted,
-          offer,
-        );
+        _recordNextGoalDecision(accepted: true);
         if (!mounted) return;
         await Navigator.pushReplacement(
           context,
@@ -187,10 +176,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
         );
         return;
       case CelebrationNextAction.later:
-        await _recordNextGoalDecision(
-          ProductEventName.nextGoalOfferDeferred,
-          offer,
-        );
+        _recordNextGoalDecision(accepted: false);
         if (!mounted) return;
         Navigator.pop(context);
         return;
@@ -200,24 +186,8 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
     }
   }
 
-  Future<void> _recordNextGoalDecision(
-    ProductEventName name,
-    NextGoalOffer offer,
-  ) async {
-    final eventStore = context.read<ProductEventStore?>();
-    if (eventStore == null) return;
-    try {
-      await eventStore.record(
-        ProductEventRecord(
-          name: name,
-          occurredAt: DateTime.now().toUtc(),
-          properties: <String, String>{'offerKind': offer.kind.name},
-        ),
-      );
-    } on Object catch (error) {
-      debugPrint('บันทึก next-goal event ไม่สำเร็จ: $error');
-    }
-  }
+  void _recordNextGoalDecision({required bool accepted}) =>
+      context.read<AppState>().recordNextGoalDecision(accepted: accepted);
 
   Widget _destTile(String label, bool active,
       {VoidCallback? onTap, Widget? trailing}) {

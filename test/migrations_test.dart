@@ -32,7 +32,7 @@ void main() {
     );
   });
 
-  test('v1 → v5 แปลงเงินบาทและ migrate transaction ต่อขั้น', () {
+  test('v1 → current แปลงเงินบาทและ migrate transaction ต่อขั้น', () {
     final raw = <String, dynamic>{
       'schemaVersion': 1,
       'goals': <dynamic>[
@@ -155,7 +155,8 @@ void main() {
     expect(entries['slip']!['destinationGoalId'], 'destination');
   });
 
-  test('v3 → v5 คงผล v4 เรื่อง canonical flow/milestone และไม่หัก EXP เดิม',
+  test(
+      'v3 → current คงผล v4 เรื่อง canonical flow/milestone และไม่หัก EXP เดิม',
       () {
     final raw = <String, dynamic>{
       'schemaVersion': 3,
@@ -217,7 +218,7 @@ void main() {
   });
 
   test(
-      'v4 → v5 ลบภารกิจที่ทำไม่ได้ รักษา badge ที่ unlock และเติม goal snapshots',
+      'v4 → current ลบภารกิจที่ทำไม่ได้ รักษา badge ที่ unlock และเติม goal snapshots',
       () {
     final raw = <String, dynamic>{
       'schemaVersion': 4,
@@ -267,7 +268,7 @@ void main() {
     final badges =
         (migrated['badges'] as List).cast<Map<String, dynamic>>().toList();
 
-    expect(migrated['schemaVersion'], 5);
+    expect(migrated['schemaVersion'], currentSchemaVersion);
     expect((migrated['user'] as Map<String, dynamic>)['exp'], 777);
     expect(questIds, <String>['q-deposit', 'q-allocate']);
     expect(

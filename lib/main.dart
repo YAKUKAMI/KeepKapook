@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/quick_entry/quick_entry_controller.dart';
 import 'services/notifications/notification_controller.dart';
-import 'services/product_event_store.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
 import 'screens/dashboard_screen.dart';
@@ -26,9 +25,6 @@ void main() {
         ),
         ChangeNotifierProvider(
           create: (_) => QuickEntryController()..load(),
-        ),
-        Provider<ProductEventStore>(
-          create: (_) => SharedPreferencesProductEventStore(),
         ),
       ],
       child: const KeepKapookApp(),

@@ -87,6 +87,10 @@ void main() {
     expect(app.user.exp, greaterThan(7));
     expect(app.quests.single.progress, 1);
     expect(app.badges.single.unlocked, isTrue);
+    expect(
+      app.localMetrics.toJson()['quickEntryTierCounts'],
+      containsPair('high', 1),
+    );
     expect(find.textContaining('บันทึก'), findsWidgets);
     expect(find.text('ยกเลิก'), findsOneWidget);
 
@@ -98,6 +102,7 @@ void main() {
     expect(app.user.exp, 7);
     expect(app.quests.single.progress, 0);
     expect(app.badges.single.unlocked, isFalse);
+    expect(app.localMetrics.undoCount, 1);
     await app.flushPendingSaves();
   });
 
@@ -118,6 +123,12 @@ void main() {
     expect(find.text('ต้องการบันทึกการโอนเป็นอะไร?'), findsOneWidget);
     expect(find.text('รายจ่าย'), findsOneWidget);
     expect(find.text('ย้ายเข้ากระปุก'), findsOneWidget);
+    expect(
+      app.localMetrics.toJson()['quickEntryTierCounts'],
+      containsPair('low', 1),
+    );
+    expect(app.localMetrics.parserCorpus.single.input, 'โอน500');
+    await app.flushPendingSaves();
   });
 
   testWidgets('ออมกับหลายกระปุกถามปลายทางก่อนและยังไม่บันทึก', (tester) async {
@@ -136,6 +147,12 @@ void main() {
     expect(find.text('ต้องการเก็บเงินเข้ากระปุกไหน?'), findsOneWidget);
     expect(find.text('เที่ยว'), findsOneWidget);
     expect(find.text('ค่าเทอม'), findsOneWidget);
+    expect(
+      app.localMetrics.toJson()['quickEntryTierCounts'],
+      containsPair('low', 1),
+    );
+    expect(app.localMetrics.parserCorpus.single.input, 'ออม 300');
+    await app.flushPendingSaves();
   });
 
   testWidgets('medium บันทึกทันทีและเปลี่ยนหมวดในบรรทัดเดิมได้',
