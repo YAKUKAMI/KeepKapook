@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
+import '../services/product_event_store.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import '../utils/next_goal_offer.dart';
+import '../utils/product_events.dart';
 import '../widgets/celebration.dart';
+import 'new_goal_screen.dart';
 
 class AddSavingScreen extends StatefulWidget {
   final String? presetGoalId;
@@ -98,7 +102,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
           FilledButton(
             onPressed: amountSatang == null || amountSatang <= 0
                 ? null
-                : () {
+                : () async {
                     final res = app.addSaving(
                       amountSatang: amountSatang,
                       goalId: _dest == 'unallocated' ? null : _dest,
@@ -109,7 +113,17 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
                       backgroundColor: AppColors.deepGreen,
                     ));
                     if (res.completed != null) {
-                      showCelebration(context, res.completed!, res.exp);
+                      final nextOffer = app.nextGoalOfferAfter(
+                        <String>{res.completed!.id},
+                      );
+                      final action = await showCelebration(
+                        context,
+                        res.completed!,
+                        res.exp,
+                        nextOffer: nextOffer,
+                      );
+                      if (!context.mounted) return;
+                      await _handleCelebrationAction(app, nextOffer, action);
                     } else {
                       Navigator.pop(context);
                     }
@@ -119,6 +133,90 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleCelebrationAction(
+    AppState app,
+    NextGoalOffer offer,
+    CelebrationNextAction? action,
+  ) async {
+    switch (action) {
+      case CelebrationNextAction.allocateUnallocated:
+        app.allocateUnallocated(
+          offer.allocatableSatang,
+          offer.goalId!,
+        );
+        await _recordNextGoalDecision(
+          ProductEventName.nextGoalOfferAccepted,
+          offer,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'ย้าย ${formatMoney(offer.allocatableSatang)} '
+              'เข้า ${offer.goalName} แล้ว',
+            ),
+            backgroundColor: AppColors.deepGreen,
+          ),
+        );
+        Navigator.pop(context);
+        return;
+      case CelebrationNextAction.continueGoal:
+        await _recordNextGoalDecision(
+          ProductEventName.nextGoalOfferAccepted,
+          offer,
+        );
+        if (!mounted) return;
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => AddSavingScreen(presetGoalId: offer.goalId),
+          ),
+        );
+        return;
+      case CelebrationNextAction.createGoal:
+        await _recordNextGoalDecision(
+          ProductEventName.nextGoalOfferAccepted,
+          offer,
+        );
+        if (!mounted) return;
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(builder: (_) => const NewGoalScreen()),
+        );
+        return;
+      case CelebrationNextAction.later:
+        await _recordNextGoalDecision(
+          ProductEventName.nextGoalOfferDeferred,
+          offer,
+        );
+        if (!mounted) return;
+        Navigator.pop(context);
+        return;
+      case null:
+        Navigator.pop(context);
+        return;
+    }
+  }
+
+  Future<void> _recordNextGoalDecision(
+    ProductEventName name,
+    NextGoalOffer offer,
+  ) async {
+    final eventStore = context.read<ProductEventStore?>();
+    if (eventStore == null) return;
+    try {
+      await eventStore.record(
+        ProductEventRecord(
+          name: name,
+          occurredAt: DateTime.now().toUtc(),
+          properties: <String, String>{'offerKind': offer.kind.name},
+        ),
+      );
+    } on Object catch (error) {
+      debugPrint('บันทึก next-goal event ไม่สำเร็จ: $error');
+    }
   }
 
   Widget _destTile(String label, bool active,

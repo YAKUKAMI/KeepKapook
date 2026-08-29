@@ -80,6 +80,8 @@ Recovery Plan · export/import JSON พร้อม migration + validation · de
 confidence tiers high/medium/low/reject · บันทึกทันทีพร้อม undo · inline correction ·
 แก้ไข/ลบรายการย้อนหลังจากหน้า History และ Ledger
 
+**มี CTA หลังถึงเป้าแล้ว:** celebration ชวนเก็บต่อให้เป้าค้างที่ใกล้ถึงที่สุดก่อน หรือสร้างเป้าใหม่เมื่อไม่มีเป้าค้าง; ถ้ามียอดยังไม่จัดสรรย้ายเข้าเป้าถัดไปได้ในคลิกเดียว และเลือก “ไว้ก่อน” ได้โดยไม่เสีย EXP/streak หรือถูกบังคับ
+
 **ยังไม่มี:** monthly review แบบเต็ม · reconciliation · cloud sync · บัญชีผู้ใช้ · LINE · OCR สลิป
 
 **มี weekly review แล้ว:** first-week review วันที่ 7 + รอบจันทร์-อาทิตย์ที่ดูย้อนหลังได้ ·
@@ -495,6 +497,7 @@ preview ก่อนลง ledger · unlink และลบบัญชีได
 - [x] local notification (เตือนบันทึก + เตือน review)
 - [x] quick record ในแอป: ปุ่มออม 20/50/100 + รายจ่ายสั้น + undo 5 วินาที
 - [x] weekly review + first-week review วันที่ 7 + ประวัติ + ตัวเชื่อมรายจ่ายกับวันถึงเป้า
+- [x] CTA เป้าหมายถัดไปใน celebration + ย้ายยอดยังไม่จัดสรร + “ไว้ก่อน” โดยไม่ลงโทษ
 - [ ] event tracking แบบไม่เก็บข้อมูลละเอียดเกินจำเป็น
 
 **ตัดออกจาก Phase 1:** monthly review ฉบับเต็ม · coaching insight ที่ซับซ้อน ·

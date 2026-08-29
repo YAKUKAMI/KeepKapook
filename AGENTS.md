@@ -46,12 +46,14 @@ lib/
 ├─ state/app_state.dart      AppState (ChangeNotifier): action หลัก + persist + _initEmpty()
 ├─ state/conversational_entries.dart  part: save/undo + แก้ไข/ลบประวัติ
 ├─ state/quick_entries.dart  part: ออม/รายจ่ายเร็ว + snapshot undo ทั้ง state
+├─ state/next_goal_actions.dart part: orchestrate ข้อเสนอเป้าหมายถัดไปหลังฉลอง
 ├─ state/weekly_reviews.dart part: weekly report orchestration + quest completion
 ├─ state/migrations.dart     schemaVersion + framework ต่อขั้น (ปัจจุบัน v1→v2→v3→v4→v5)
 ├─ state/backup.dart         สร้าง/validate backup + preview ก่อน import
 ├─ services/backup_file_service.dart  เลือก/แชร์ไฟล์ JSON ข้าม web/mobile
 ├─ services/notifications/  controller + preference store + conditional mobile implementation/web stub
 ├─ services/quick_entry/    controller + SharedPreferences ของจำนวนลัด/หมวดล่าสุด
+├─ services/product_event_store.dart  local events ขั้นต่ำสำหรับ CTA เป้าหมายถัดไป
 ├─ utils/format.dart         money / date(พ.ศ.) / level-EXP / เพดาน / หมวดหมู่
 ├─ utils/financial_summary.dart  pure summaries: goal totals/progress, monthly ledger,
 │                            7-day saving series + period/category/goal-pace/expense-goal metrics
@@ -59,6 +61,8 @@ lib/
 ├─ utils/weekly_review.dart  pure weekly report + first-week/weekly period history
 ├─ utils/notification_schedule.dart  pure daily/weekly schedule + reminder copy
 ├─ utils/quick_entry.dart    pure preset validation + goal selection + feedback progress
+├─ utils/next_goal_offer.dart pure selector เป้าถัดไป + จำนวน unallocated ที่ย้ายได้
+├─ utils/product_events.dart pure event records + accepted/deferred summary
 ├─ utils/coach.dart          planStatus + recoveryOptions (Recovery Plan)
 ├─ utils/parser/             pure-Dart parser + models + dictionary
 ├─ widgets/                  goal_card, celebration, simulation_notice,
@@ -111,6 +115,7 @@ quick-entry action เป็น part แล้ว; `models.dart` ยังรว
 - Pre-import backup key: `keepkapook_state_v1_pre_import_backup` — เก็บ state ปัจจุบันก่อนกู้คืนทับทุกครั้ง
 - การตั้งค่า local notification ใช้ SharedPreferences keys prefix `keepkapook_notification_` แยกจาก state JSON; ไม่มีข้อมูลการเงินและไม่ทำให้ schemaVersion เปลี่ยน
 - การตั้งค่าบันทึกเร็วใช้ key `keepkapook_quick_saving_amounts_satang` และ `keepkapook_quick_expense_category` แยกจาก state JSON; ค่าเริ่มต้น 20/50/100 บาทถูกเก็บเป็น 2,000/5,000/10,000 สตางค์ และไม่ทำให้ schemaVersion เปลี่ยน
+- event ของ CTA เป้าหมายถัดไปใช้ key `keepkapook_product_events_v1` แยกจาก state JSON; เก็บเฉพาะชื่อ event, UTC timestamp และชนิดข้อเสนอ ไม่เก็บ goal id/ชื่อ/จำนวนเงิน และไม่ทำให้ schemaVersion เปลี่ยน (event tracking เต็มรูปแบบยังเป็นรอบ 14)
 - รูปแบบปัจจุบัน: JSON object ก้อนเดียว มี `schemaVersion: 5` และ migration framework ที่ `lib/state/migrations.dart`
 
 ตัวอย่างย่อของ JSON ที่ persist จริงในปัจจุบัน:
@@ -212,6 +217,7 @@ quick-entry action เป็น part แล้ว; `models.dart` ยังรว
 - **Local notification:** เตือนบันทึกประจำวัน + ดูสรุปเช้าวันจันทร์ ปรับเวลา/ปิดแยกได้, ขอสิทธิ์หลังบันทึกแรก, ทำงานในเครื่อง; web ใช้ stub และซ่อนเมนู
 - **Quick Record:** FAB + Dashboard เข้าถึงออมเร็ว/รายจ่ายเร็วได้โดยไม่เปลี่ยนแท็บ, จำนวนลัด 20/50/100 แก้ได้ใน Settings, จำหมวดรายจ่ายล่าสุด, แสดง progress/ยอดเดือนทันที และ undo ทั้ง state ภายใน 5 วินาที
 - **Weekly Review:** first-week วันที่ 7 + รอบจันทร์-อาทิตย์ย้อนหลัง, สรุปวันบันทึก/streak/ออม/รายจ่าย/หมวด/วันถึงเป้า และเชื่อมส่วนต่างรายจ่ายจริงกับวันที่ถึงเป้า; สูตรอยู่ใน pure utils และไม่เก็บ snapshot
+- **Next-goal CTA:** celebration เสนอเป้าค้างที่ใกล้ถึงที่สุดหรือทางลัดสร้างเป้าใหม่ใน dialog เดียวกัน; ย้ายยอดยังไม่จัดสรรเข้าเป้าถัดไปได้ครั้งเดียว และ “ไว้ก่อน” ไม่เปลี่ยน state/EXP/streak พร้อม event accepted/deferred ในเครื่อง
 - quest ปัจจุบันมี `q-deposit`, `q-allocate`, `q-weekly-consistency`, `q-weekly-review` พร้อม event handler; badge default 5 ตัวรวม `b-rhythm` มีเงื่อนไขครบ ส่วน `GoalPriority` persist ได้แต่ยังไม่มี logic/UI นำไปใช้
 
 ---

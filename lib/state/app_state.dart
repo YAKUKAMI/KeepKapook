@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 import '../utils/habit_streak.dart';
+import '../utils/next_goal_offer.dart';
 import '../utils/parser/parser.dart';
 import '../utils/quick_entry.dart';
 import '../utils/weekly_review.dart';
@@ -17,6 +18,7 @@ import 'migrations.dart';
 export 'domain_validation.dart';
 
 part 'conversational_entries.dart';
+part 'next_goal_actions.dart';
 part 'quick_entries.dart';
 part 'weekly_reviews.dart';
 
