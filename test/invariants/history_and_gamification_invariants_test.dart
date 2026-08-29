@@ -96,6 +96,7 @@ void main() {
           );
         }
       },
+      'q-weekly-review': (app) => app.completeWeeklyReview(),
     };
     final violations = <String>[];
 

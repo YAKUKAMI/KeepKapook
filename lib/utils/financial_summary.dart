@@ -1,4 +1,5 @@
 import '../models/models.dart';
+import 'habit_streak.dart';
 
 class GoalMoneySummary {
   const GoalMoneySummary({
@@ -149,3 +150,227 @@ DashboardMoneySummary summarizeDashboardMoney({
       month: summarizeLedgerMonth(ledger, now: now),
       sevenDays: summarizeSevenDaySavings(transactions, now: now),
     );
+
+/// สรุปรายการบัญชีในช่วง [start, end) ตามวันท้องถิ่นประเทศไทย
+LedgerPeriodSummary summarizeLedgerPeriod(
+  Iterable<LedgerEntry> entries, {
+  required DateTime start,
+  required DateTime end,
+}) {
+  final normalizedStart = bangkokLocalDay(start);
+  final normalizedEnd = bangkokLocalDay(end);
+  var incomeSatang = 0;
+  var expenseSatang = 0;
+  for (final entry in entries) {
+    final day = bangkokLocalDay(entry.date);
+    if (day.isBefore(normalizedStart) || !day.isBefore(normalizedEnd)) continue;
+    if (entry.type == LedgerType.income) {
+      incomeSatang += entry.amountSatang;
+    } else {
+      expenseSatang += entry.amountSatang;
+    }
+  }
+  return LedgerPeriodSummary(
+    incomeSatang: incomeSatang,
+    expenseSatang: expenseSatang,
+  );
+}
+
+int countLedgerExpenseDays(
+  Iterable<LedgerEntry> entries, {
+  required DateTime start,
+  required DateTime end,
+}) {
+  final normalizedStart = bangkokLocalDay(start);
+  final normalizedEnd = bangkokLocalDay(end);
+  return entries
+      .where((entry) => entry.type == LedgerType.expense)
+      .map((entry) => bangkokLocalDay(entry.date))
+      .where(
+        (day) => !day.isBefore(normalizedStart) && day.isBefore(normalizedEnd),
+      )
+      .toSet()
+      .length;
+}
+
+class ExpenseCategoryTotal {
+  const ExpenseCategoryTotal({
+    required this.category,
+    required this.amountSatang,
+  });
+
+  final String category;
+  final int amountSatang;
+}
+
+ExpenseCategoryTotal? summarizeTopExpenseCategory(
+  Iterable<LedgerEntry> entries, {
+  required DateTime start,
+  required DateTime end,
+}) {
+  final normalizedStart = bangkokLocalDay(start);
+  final normalizedEnd = bangkokLocalDay(end);
+  final totals = <String, int>{};
+  for (final entry in entries) {
+    final day = bangkokLocalDay(entry.date);
+    if (entry.type != LedgerType.expense ||
+        day.isBefore(normalizedStart) ||
+        !day.isBefore(normalizedEnd)) {
+      continue;
+    }
+    totals.update(
+      entry.category,
+      (amount) => amount + entry.amountSatang,
+      ifAbsent: () => entry.amountSatang,
+    );
+  }
+  if (totals.isEmpty) return null;
+  final sorted = totals.entries.toList()
+    ..sort((left, right) {
+      final byAmount = right.value.compareTo(left.value);
+      return byAmount != 0 ? byAmount : left.key.compareTo(right.key);
+    });
+  return ExpenseCategoryTotal(
+    category: sorted.first.key,
+    amountSatang: sorted.first.value,
+  );
+}
+
+int summarizeExternalGoalSavings(
+  Iterable<SavingTransaction> transactions, {
+  required DateTime start,
+  required DateTime end,
+  String? goalId,
+}) {
+  final normalizedStart = bangkokLocalDay(start);
+  final normalizedEnd = bangkokLocalDay(end);
+  var totalSatang = 0;
+  for (final transaction in transactions) {
+    final day = bangkokLocalDay(transaction.date);
+    if (transaction.flow != TransactionFlow.externalIn ||
+        transaction.destinationGoalId == null ||
+        (goalId != null && transaction.destinationGoalId != goalId) ||
+        day.isBefore(normalizedStart) ||
+        !day.isBefore(normalizedEnd)) {
+      continue;
+    }
+    totalSatang += transaction.amountSatang;
+  }
+  return totalSatang;
+}
+
+int countExternalGoalSavingDays(
+  Iterable<SavingTransaction> transactions, {
+  required DateTime start,
+  required DateTime end,
+  String? goalId,
+}) {
+  final normalizedStart = bangkokLocalDay(start);
+  final normalizedEnd = bangkokLocalDay(end);
+  return transactions
+      .where(
+        (transaction) =>
+            transaction.flow == TransactionFlow.externalIn &&
+            transaction.destinationGoalId != null &&
+            (goalId == null || transaction.destinationGoalId == goalId),
+      )
+      .map((transaction) => bangkokLocalDay(transaction.date))
+      .where(
+        (day) => !day.isBefore(normalizedStart) && day.isBefore(normalizedEnd),
+      )
+      .toSet()
+      .length;
+}
+
+class GoalPaceProjection {
+  const GoalPaceProjection({
+    required this.weeklySavingSatang,
+    required this.remainingSatang,
+    required this.daysToGoal,
+  });
+
+  final int weeklySavingSatang;
+  final int remainingSatang;
+  final int daysToGoal;
+}
+
+GoalPaceProjection? projectGoalAtWeeklyPace({
+  required int currentSatang,
+  required int targetSatang,
+  required int weeklySavingSatang,
+}) {
+  final remainingSatang = targetSatang - currentSatang;
+  if (remainingSatang <= 0 || weeklySavingSatang <= 0) return null;
+  final numerator = BigInt.from(remainingSatang) * BigInt.from(7);
+  final denominator = BigInt.from(weeklySavingSatang);
+  final daysToGoal =
+      ((numerator + denominator - BigInt.one) ~/ denominator).toInt();
+  return GoalPaceProjection(
+    weeklySavingSatang: weeklySavingSatang,
+    remainingSatang: remainingSatang,
+    daysToGoal: daysToGoal,
+  );
+}
+
+class ExpenseGoalLinkMetrics {
+  const ExpenseGoalLinkMetrics({
+    required this.observedDifferenceSatang,
+    required this.expensesIncreased,
+    required this.currentWeeklySavingSatang,
+    this.daysSooner,
+    this.needsSavingStart = false,
+  });
+
+  final int observedDifferenceSatang;
+  final bool expensesIncreased;
+  final int currentWeeklySavingSatang;
+  final int? daysSooner;
+  final bool needsSavingStart;
+}
+
+/// เชื่อมส่วนต่างรายจ่ายที่สังเกตได้จริงกับเวลาถึงเป้าหมาย
+///
+/// ไม่สร้างงบสมมติขึ้นเอง และคืน null เมื่อผลต่างช่วยให้เร็วขึ้นไม่ถึงหนึ่งวัน
+/// เพื่อไม่ให้ UI กล่าวเกินความหมายของข้อมูลที่มี
+ExpenseGoalLinkMetrics? calculateExpenseGoalLink({
+  required int currentExpenseSatang,
+  required int previousExpenseSatang,
+  required int currentGoalSatang,
+  required int targetGoalSatang,
+  required int currentWeeklySavingSatang,
+}) {
+  if (currentExpenseSatang <= 0 || previousExpenseSatang <= 0) return null;
+  final signedDifference = currentExpenseSatang - previousExpenseSatang;
+  final observedDifference = signedDifference.abs();
+  final remainingSatang = targetGoalSatang - currentGoalSatang;
+  if (observedDifference <= 0 || remainingSatang <= 0) return null;
+  if (currentWeeklySavingSatang <= 0) {
+    return ExpenseGoalLinkMetrics(
+      observedDifferenceSatang: observedDifference,
+      expensesIncreased: signedDifference > 0,
+      currentWeeklySavingSatang: 0,
+      needsSavingStart: true,
+    );
+  }
+
+  final currentProjection = projectGoalAtWeeklyPace(
+    currentSatang: currentGoalSatang,
+    targetSatang: targetGoalSatang,
+    weeklySavingSatang: currentWeeklySavingSatang,
+  );
+  final improvedProjection = projectGoalAtWeeklyPace(
+    currentSatang: currentGoalSatang,
+    targetSatang: targetGoalSatang,
+    weeklySavingSatang: currentWeeklySavingSatang + observedDifference,
+  );
+  if (currentProjection == null || improvedProjection == null) return null;
+  final daysSooner =
+      currentProjection.daysToGoal - improvedProjection.daysToGoal;
+  if (daysSooner < 1) return null;
+  return ExpenseGoalLinkMetrics(
+    observedDifferenceSatang: observedDifference,
+    expensesIncreased: signedDifference > 0,
+    currentWeeklySavingSatang: currentWeeklySavingSatang,
+    daysSooner: daysSooner,
+  );
+}

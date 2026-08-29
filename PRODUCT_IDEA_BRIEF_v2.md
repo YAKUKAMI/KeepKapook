@@ -80,8 +80,11 @@ Recovery Plan · export/import JSON พร้อม migration + validation · de
 confidence tiers high/medium/low/reject · บันทึกทันทีพร้อม undo · inline correction ·
 แก้ไข/ลบรายการย้อนหลังจากหน้า History และ Ledger
 
-**ยังไม่มี:** weekly/monthly review แบบเต็ม ·
-insight เชื่อมรายจ่ายกับวันถึงเป้า · reconciliation · cloud sync · บัญชีผู้ใช้ · LINE · OCR สลิป
+**ยังไม่มี:** monthly review แบบเต็ม · reconciliation · cloud sync · บัญชีผู้ใช้ · LINE · OCR สลิป
+
+**มี weekly review แล้ว:** first-week review วันที่ 7 + รอบจันทร์-อาทิตย์ที่ดูย้อนหลังได้ ·
+จำนวนวันบันทึก/streak/ออมเข้าเป้า/รายจ่าย/หมวดสูงสุด/วันที่คาดว่าจะถึงเป้า ·
+ตัวเชื่อมใช้เฉพาะส่วนต่างรายจ่ายจากสัปดาห์ก่อนที่วัดได้จริงและไม่แสดงเมื่อข้อมูลไม่พอ
 
 **มี streak แล้ว:** current/longest streak + ผ่อนผัน 1 วัน + ปฏิทินรายเดือนที่เปิดดูรายการตามวันบน Dashboard โดยคำนวณจาก timestamp ของรายการ ไม่เก็บ cache
 
@@ -491,7 +494,7 @@ preview ก่อนลง ledger · unlink และลบบัญชีได
 - [x] streak + ปฏิทินการออม
 - [x] local notification (เตือนบันทึก + เตือน review)
 - [x] quick record ในแอป: ปุ่มออม 20/50/100 + รายจ่ายสั้น + undo 5 วินาที
-- [ ] weekly review + first-week review วันที่ 7
+- [x] weekly review + first-week review วันที่ 7 + ประวัติ + ตัวเชื่อมรายจ่ายกับวันถึงเป้า
 - [ ] event tracking แบบไม่เก็บข้อมูลละเอียดเกินจำเป็น
 
 **ตัดออกจาก Phase 1:** monthly review ฉบับเต็ม · coaching insight ที่ซับซ้อน ·
@@ -500,7 +503,7 @@ shareable card · OS home screen widget · challenge — ทั้งหมด�
 ### Phase 2 — ขยายเหตุผลที่กลับมา (หลังผ่าน gate 1)
 
 monthly review + ดูย้อนหลัง · **reconciliation ritual (§8)** ·
-insight เชื่อมรายจ่ายกับวันถึงเป้า · shareable progress card · OS home screen widget · challenge รายเดือน
+insight รายเดือน/หลายสัปดาห์ที่ซับซ้อนขึ้น · shareable progress card · OS home screen widget · challenge รายเดือน
 
 ### Phase 3 — Cloud (มีเงื่อนไข ไม่ใช่แผนที่ตายตัว)
 
