@@ -346,7 +346,7 @@ void someAction(...) {
 - [x] แยก flexible pocket ให้รับเงินไม่จำกัด ไม่มี overflow/progress/milestone/completed
 - [x] แก้กราฟ 7 วันและค่าเฉลี่ยเงินออมให้นับจาก `TransactionFlow.externalIn`
 - [x] `q-allocate` มี handler จาก event จัดสรรจริง และไม่แจก base/milestone EXP ซ้ำ
-- [ ] คืน `q-weekly-review` ในรอบ 13 เมื่อ Weekly Review มี completion event และเทส progress จริง (ถอนจาก default/state ที่ยังไม่สำเร็จใน schema v5)
+- [ ] คืน `q-weekly-review` ในรอบ 12 เมื่อ Weekly Review มี completion event และเทส progress จริง (ถอนจาก default/state ที่ยังไม่สำเร็จใน schema v5)
 - [x] คืน `q-weekly-consistency` เมื่อระบบ streak มี event source และเทส progress จริง
 - [x] คืน `b-rhythm` เมื่อ streak 7 วัน unlock ได้จริง; badge ที่เคย unlock ยังคงอยู่
 - [ ] พิจารณา `b-memory` ใหม่เมื่อมี Album subsystem ที่อนุมัติเข้าแผนหลัง Phase 2 และมี unlock event/test; ตอนนี้ลบจาก default และถอนเฉพาะตัวที่ยังไม่ unlock ใน schema v5
