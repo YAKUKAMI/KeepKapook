@@ -7,6 +7,8 @@ import '../models/models.dart';
 import '../utils/financial_summary.dart';
 import '../utils/format.dart';
 import '../utils/habit_streak.dart';
+import '../utils/local_metrics.dart';
+import '../utils/next_goal_offer.dart';
 import '../utils/parser/parser.dart';
 import '../utils/quick_entry.dart';
 import '../utils/weekly_review.dart';
@@ -17,6 +19,8 @@ import 'migrations.dart';
 export 'domain_validation.dart';
 
 part 'conversational_entries.dart';
+part 'local_metrics_actions.dart';
+part 'next_goal_actions.dart';
 part 'quick_entries.dart';
 part 'weekly_reviews.dart';
 
@@ -49,12 +53,18 @@ class SavingResult {
 }
 
 class AppState extends ChangeNotifier {
-  AppState({Future<bool> Function(String raw)? stateWriter})
-      : _stateWriter = stateWriter;
+  AppState({
+    Future<bool> Function(String raw)? stateWriter,
+    DateTime Function()? now,
+  })  : _stateWriter = stateWriter,
+        _now = now ?? DateTime.now {
+    localMetrics = LocalMetrics.empty(installedAt: _now());
+  }
 
   static const Duration _saveDebounceDuration = Duration(milliseconds: 300);
 
   final Future<bool> Function(String raw)? _stateWriter;
+  final DateTime Function() _now;
   Timer? _saveDebounce;
   Future<void> _saveQueue = Future<void>.value();
   String? _pendingSaveSnapshot;
@@ -67,6 +77,7 @@ class AppState extends ChangeNotifier {
   List<AchievementBadge> badges = [];
   List<LedgerEntry> ledger = [];
   int unallocatedSatang = 0;
+  late LocalMetrics localMetrics;
   bool loaded = false;
   String? loadErrorMessage;
   int _recordSavedSerial = 0;
@@ -220,6 +231,7 @@ class AppState extends ChangeNotifier {
         'badges': badges.map((b) => b.toJson()).toList(),
         'ledger': ledger.map((e) => e.toJson()).toList(),
         'unallocatedSatang': unallocatedSatang,
+        'metrics': localMetrics.toJson(),
       };
 
   void _fromJson(
@@ -233,6 +245,12 @@ class AppState extends ChangeNotifier {
     badges = _jsonList(j['badges'], AchievementBadge.fromJson);
     ledger = _jsonList(j['ledger'], LedgerEntry.fromJson);
     unallocatedSatang = j['unallocatedSatang'] as int? ?? 0;
+    localMetrics = LocalMetrics.fromJson(_jsonObject(j['metrics']));
+    if (localMetrics.installedDay.isEmpty) {
+      localMetrics = localMetrics.copyWith(
+        installedDay: metricDayKey(_now()),
+      );
+    }
     if (hydrateCurrentDefinitions) {
       _ensureGamificationDefinitions();
       _refreshHabitRewards(asOf: DateTime.now());
@@ -266,6 +284,10 @@ class AppState extends ChangeNotifier {
         note: note,
         date: recordedAt,
       ),
+    );
+    _recordLoggingMetric(
+      recordedAt,
+      type == LedgerType.expense ? LoggingKind.expense : LoggingKind.other,
     );
     _refreshHabitRewards(asOf: recordedAt);
     _recordSavedSerial++;
@@ -593,6 +615,7 @@ class AppState extends ChangeNotifier {
 
     if (transactionFlow == TransactionFlow.externalIn) {
       _progressQuest('q-deposit');
+      _recordLoggingMetric(now, LoggingKind.saving);
     }
 
     user.exp += exp;
@@ -715,6 +738,7 @@ class AppState extends ChangeNotifier {
     transactions = [];
     ledger = [];
     unallocatedSatang = 0;
+    localMetrics = LocalMetrics.empty(installedAt: _now());
     quests = _defaultQuests();
     badges = _defaultBadges();
     addGoal(

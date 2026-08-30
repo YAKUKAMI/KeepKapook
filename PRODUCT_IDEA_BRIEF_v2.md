@@ -28,7 +28,7 @@
 | รอบ | สถานะ | ข้ามอะไรได้ / ยังต้องทำอะไร |
 |---|---|---|
 | **A — Strategy & MVP** | ผ่านการทบทวนระดับเอกสารแล้ว | ข้ามการวิเคราะห์ positioning/MVP ซ้ำได้ แต่ยังต้องทำฟีเจอร์ Phase 1 ที่เหลือและวัด Gate 1 กับผู้ใช้จริง |
-| **B — Parser design** | implementation รอบแรกเสร็จแล้ว | ข้ามการออกแบบ parser ตั้งต้นได้: deterministic pipeline, `ParseResult`, confidence tiers, operator, UI/undo/edit-delete และ synthetic regression corpus ทำแล้ว; ก่อนปล่อยยังต้องมี corpus จริงอย่างน้อย 20 ประโยค |
+| **B — Parser design** | implementation รอบแรกเสร็จแล้ว | ข้ามการออกแบบ parser ตั้งต้นได้: deterministic pipeline, `ParseResult`, confidence tiers, operator, UI/undo/edit-delete และ synthetic regression corpus ทำแล้ว; accuracy จริงต้องวัดใหม่เมื่อมี corpus ผู้ใช้จริงอย่างน้อย 50 ประโยค |
 | **C — Cloud & LINE** | ยังไม่เริ่ม | ห้ามข้าม gate; รอผล Gate 1 และหลักฐานจากผู้ใช้ตาม §10 |
 
 ทุกคำตอบต้องแยกให้ชัดว่าเป็น **ข้อเท็จจริง** / **สมมติฐาน** / **ข้อเสนอ**
@@ -43,8 +43,8 @@
 - ฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก เป็นการจำลอง และ UI ต้องแจ้งเสมอ
 - จำนวนเงินที่ persist ทุก field เป็น `int` หน่วยสตางค์: `amountSatang`, `targetSatang`, `currentSatang`, `unallocatedSatang`; `double` ที่พบเป็น progress/confidence ไม่ใช่ยอดเงิน
 - persist ในเครื่องด้วย `shared_preferences` เป็น JSON object ก้อนเดียวที่ key `keepkapook_state_v1`
-- JSON ที่เขียนใหม่มี `schemaVersion: 5`; ชื่อ key ที่ลงท้าย `_v1` เป็นชื่อเดิมเพื่อ compatibility ไม่ใช่ schema version
-- migration ปัจจุบันอยู่ `lib/state/migrations.dart`: ข้อมูลที่ไม่มี `schemaVersion` ถือเป็น v1, migrate v1→v2 เพื่อแปลงเงินบาท `double` เป็นสตางค์ `int`, v2→v3 เพื่อเพิ่ม flow/destination ID, v3→v4 เพื่อ canonicalize type/flow พร้อมจำ milestone สูงสุด และ v4→v5 เพื่อเก็บชื่อ goal ในประวัติพร้อมถอน quest/badge ที่ไม่มี handler โดยไม่หัก EXP เดิม
+- JSON ที่เขียนใหม่มี `schemaVersion: 6`; ชื่อ key ที่ลงท้าย `_v1` เป็นชื่อเดิมเพื่อ compatibility ไม่ใช่ schema version
+- migration ปัจจุบันอยู่ `lib/state/migrations.dart`: ข้อมูลที่ไม่มี `schemaVersion` ถือเป็น v1, migrate v1→v2 เพื่อแปลงเงินบาท `double` เป็นสตางค์ `int`, v2→v3 เพื่อเพิ่ม flow/destination ID, v3→v4 เพื่อ canonicalize type/flow พร้อมจำ milestone สูงสุด, v4→v5 เพื่อเก็บชื่อ goal ในประวัติพร้อมถอน quest/badge ที่ไม่มี handler โดยไม่หัก EXP เดิม และ v5→v6 เพื่อเพิ่ม local metrics/W4/corpus โดยอนุมานตัวนับพื้นฐานจากข้อมูลเดิม
 - ทุกการเปลี่ยน model/persistence ต้อง bump schema และเพิ่ม migration แบบต่อขั้น
 - ต้องทำงานทั้ง web และ mobile
 - ห้ามใส่ secret / token / signing key ใน repo
@@ -80,6 +80,8 @@ Recovery Plan · export/import JSON พร้อม migration + validation · de
 confidence tiers high/medium/low/reject · บันทึกทันทีพร้อม undo · inline correction ·
 แก้ไข/ลบรายการย้อนหลังจากหน้า History และ Ledger
 
+**มี CTA หลังถึงเป้าแล้ว:** celebration ชวนเก็บต่อให้เป้าค้างที่ใกล้ถึงที่สุดก่อน หรือสร้างเป้าใหม่เมื่อไม่มีเป้าค้าง; ถ้ามียอดยังไม่จัดสรรย้ายเข้าเป้าถัดไปได้ในคลิกเดียว และเลือก “ไว้ก่อน” ได้โดยไม่เสีย EXP/streak หรือถูกบังคับ
+
 **ยังไม่มี:** monthly review แบบเต็ม · reconciliation · cloud sync · บัญชีผู้ใช้ · LINE · OCR สลิป
 
 **มี weekly review แล้ว:** first-week review วันที่ 7 + รอบจันทร์-อาทิตย์ที่ดูย้อนหลังได้ ·
@@ -89,7 +91,7 @@ confidence tiers high/medium/low/reject · บันทึกทันทีพ�
 **มี streak แล้ว:** current/longest streak + ผ่อนผัน 1 วัน + ปฏิทินรายเดือนที่เปิดดูรายการตามวันบน Dashboard โดยคำนวณจาก timestamp ของรายการ ไม่เก็บ cache
 
 **ข้อจำกัดของ implementation ปัจจุบัน:** parser fixture สังเคราะห์มี 37 เคส (amount assertion 36 เคส)
-และใช้เป็น regression ได้ แต่ยังไม่มี corpus จริงขั้นต่ำ 20 ประโยคจากผู้ใช้;
+และใช้เป็น regression ได้ แต่ยังไม่มี corpus จริงขั้นต่ำ 50 ประโยคจากผู้ใช้สำหรับวัด accuracy จริง;
 กราฟ 7 วันและ date/time ยังทำตามกฎ UTC/local ไม่ครบ;
 `GoalPriority` persist ได้แต่ยังไม่มี UI/business logic ใช้งาน
 
@@ -206,7 +208,11 @@ KeepKapook ยังทำงานข้ามธนาคารและรว
 3. **ห้ามพูดเกินข้อมูลที่รู้จริง** — ทุก insight มาจาก pure function ที่เทสได้ ห้ามคาดเดาสถานะการเงินที่แอปไม่เห็น
 4. **ยอมรับว่าเลขในแอปไม่ตรงเงินจริง แล้วออกแบบพิธีกรรมมารองรับ** (§8) แทนที่จะแปะ disclaimer แล้วหวังว่าผู้ใช้จะเข้าใจ
 5. **offline-first ไม่ใช่ข้อจำกัด แต่เป็นจุดขาย** — ทุกข้อเสนอที่ต้องการ backend ต้องพิสูจน์ว่าคุ้มกับการเสียจุดนี้
-6. **ห้ามลงโทษผู้ใช้** — ไม่หัก EXP ไม่รีเซ็ต streak แบบไร้ทางแก้ ไม่ใช้คำว่า "ล้มเหลว" คนที่รู้สึกผิดจะไม่เปิดแอปอีก
+6. **ห้ามทำให้ผู้ใช้รู้สึกผิดในเรื่องที่เขาคุมไม่ได้** — ยอดเงิน จำนวนที่ออมได้ และฐานะ ไม่ใช่สิ่งที่แอปควรใช้กดดันผู้ใช้ แต่สร้างแรงจูงใจจากความต่อเนื่องของการบันทึกได้ เพราะเป็นพฤติกรรมที่ผู้ใช้คุมได้เอง โดยต้อง:
+   - ให้ตัวละครรับอารมณ์แทนการชี้ที่ตัวผู้ใช้
+   - กดดันก่อนเกิด ไม่ใช่ตำหนิย้อนหลัง
+   - ให้อภัยทันทีที่กลับมา
+   - ไม่ทำให้เสียของที่ได้มาแล้ว เช่น EXP, badge และประวัติ
 
 ---
 
@@ -216,9 +222,9 @@ KeepKapook ยังทำงานข้ามธนาคารและรว
 
 **สถานะ implementation ณ 27 ส.ค. 2569:** ทำ deterministic parser แบบ pure Dart แล้วที่
 `lib/utils/parser/` พร้อม dictionary แยกไฟล์, confidence ราย field, tier, operator,
-relative date, widget flow ตาม tier, undo และแก้/ลบย้อนหลัง ชุด corpus ปัจจุบันให้ accuracy
-amount/type/category/date 100% ใน fixture ของโปรเจกต์และ silent high error = 0
-(เป็นผลบน fixture 37 เคส ไม่ใช่ผลจากผู้ใช้จริง)
+relative date, widget flow ตาม tier, undo และแก้/ลบย้อนหลัง ชุด regression สังเคราะห์
+78 เคสที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้วอยู่ที่ `test/fixtures/parser_edge_cases.dart`
+เพื่อผูก regression gate 98/95/80 แต่ห้ามเรียกผลจากชุดนี้ว่า accuracy กับผู้ใช้จริง
 
 เป็น **ตัวคูณ** ไม่ใช่ตัว loop — เหตุผลที่คนเลิกจดรายจ่ายคือจดแล้วไม่ได้อะไรกลับมา
 ไม่ใช่เพราะฟอร์มมี 4 ช่อง การลดจาก 15 วินาทีเหลือ 5 วินาทีไม่แก้ปัญหานั้นด้วยตัวเอง
@@ -321,12 +327,13 @@ amount/type/category/date 100% ใน fixture ของโปรเจกต์�
 จ่ายค่าเช่า4500ทุกเดือน  → จ่าย 4,500 + เสนอตั้งเป็นรายการประจำ
 ```
 
-ตัวอย่างด้านบนมาจาก AI/ทีม จึง **ไม่นับเป็น corpus จริง** ก่อนปล่อยต้องมีอย่างน้อย
-**20 ประโยคจริงแบบ verbatim** จากกลุ่มเป้าหมายหรือการจดใช้จริง (ลบ PII ได้ แต่ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
+ตัวอย่างด้านบนมาจาก AI/ทีม จึง **ไม่นับเป็น corpus จริง** ประโยคสังเคราะห์ที่ผ่านการตรวจโดย
+เจ้าของภาษาในกลุ่มเป้าหมายใช้ผูก regression gate 98/95/80 ได้ แต่ห้ามเรียกผลนั้นว่า accuracy กับผู้ใช้จริง
+accuracy จริงวัดได้เมื่อมีอย่างน้อย **50 ประโยคจริงแบบ verbatim** จากผู้ใช้ (ลบ PII ได้ แต่ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
 parser เป็นตัวเพิ่มความสะดวก ไม่ใช่จุดขาย จึงลดพื้นที่ปัญหาเริ่มต้น แต่ไม่ลดเกณฑ์ความถูกต้อง
 
 หลังปล่อย corpus ต้องโตจากข้อความจริงที่ได้ tier `low`/`reject` หรือถูกผู้ใช้แก้หลังบันทึก
-ผ่าน event tracking รอบ 14 และให้ยกเกณฑ์ accuracy ขึ้นเมื่อ corpus โต ห้ามลด threshold เพื่อทำให้เทสผ่าน
+ผ่าน local metrics รอบ 14 (ผู้ใช้ปิด/ล้างได้) และวัดเทียบกับ synthetic regression ใหม่เมื่อครบ 50 ประโยค ห้ามลด threshold เพื่อทำให้เทสผ่าน
 
 **เกณฑ์คุณภาพที่ต้องผ่านก่อนปล่อย:** accuracy ของ *จำนวนเงิน* ≥ 98% (ผิดเรื่องเงินคือบาปที่ให้อภัยไม่ได้) ·
 accuracy ของ *ประเภท* ≥ 95% · *หมวดหมู่* ≥ 80% (แก้ง่าย ผิดได้บ้าง) ·
@@ -495,7 +502,8 @@ preview ก่อนลง ledger · unlink และลบบัญชีได
 - [x] local notification (เตือนบันทึก + เตือน review)
 - [x] quick record ในแอป: ปุ่มออม 20/50/100 + รายจ่ายสั้น + undo 5 วินาที
 - [x] weekly review + first-week review วันที่ 7 + ประวัติ + ตัวเชื่อมรายจ่ายกับวันถึงเป้า
-- [ ] event tracking แบบไม่เก็บข้อมูลละเอียดเกินจำเป็น
+- [x] CTA เป้าหมายถัดไปใน celebration + ย้ายยอดยังไม่จัดสรร + “ไว้ก่อน” โดยไม่ลงโทษ
+- [x] local event counters + W4 retention + parser corpus แบบ opt-out/clear/export โดยไม่ใช้ analytics SDK และไม่ส่งอัตโนมัติ
 
 **ตัดออกจาก Phase 1:** monthly review ฉบับเต็ม · coaching insight ที่ซับซ้อน ·
 shareable card · OS home screen widget · challenge — ทั้งหมดนี้ดี แต่ไม่ใช่ตัวพิสูจน์สมมติฐาน
@@ -533,6 +541,11 @@ LINE integration · OCR สลิปอัตโนมัติ · โหมด�
 ⚠️ ความเสี่ยงที่ต้องรู้: การชูสองฟีเจอร์ทำให้ Gate 1 วัดสอง loop พร้อมกัน
 ถ้า retention ออกมาแย่ จะแยกยากว่า loop ไหนพัง — ให้ใช้ event tracking รอบ 14
 แยกดูว่าคนบันทึกอะไรมากกว่ากัน (การออม vs รายจ่าย)
+
+**implementation ปัจจุบัน:** ตัวนับทั้งหมดอยู่ใน `metrics` ของ state JSON บนเครื่องและรวมในไฟล์ export
+โดยไม่ส่งอัตโนมัติ W4 ใช้ `installedDay` ร่วมกับ `recordingDays`: สัปดาห์ที่ 4 คือวันที่ 22–28
+นับจากวันติดตั้ง และถือว่า retained เมื่อมีวันบันทึกอย่างน้อยหนึ่งวันในช่วงนั้น ผู้ใช้ดูตัวเลขทั้งหมด
+ปิดการสะสม parser corpus หรือล้าง corpus เดิมได้ที่ Settings > ข้อมูลการใช้งานในเครื่อง
 
 ### Supporting metrics
 
@@ -586,7 +599,7 @@ W8 retention ≥ 15% · มีผู้ใช้ ≥ 50 คนที่ใช้
 6. อะไรใน backlog ปัจจุบันที่ควร **ตัดทิ้งถาวร** ไม่ใช่แค่เลื่อน
 7. หลักการออกแบบ §6 มีข้อไหนที่ขัดกันเองหรือจะพาไปผิดทาง
 
-### รอบ B — Parser (implementation รอบแรกเสร็จ; ข้าม design ตั้งต้นได้ แต่ corpus จริงขั้นต่ำ 20 ประโยคยังไม่ครบ)
+### รอบ B — Parser (implementation รอบแรกเสร็จ; ข้าม design ตั้งต้นได้ แต่ corpus ผู้ใช้จริงขั้นต่ำ 50 ประโยคสำหรับวัด accuracy ยังไม่ครบ)
 
 8. deterministic / LLM / hybrid — แบ่งความรับผิดชอบอย่างไร และ LLM คุ้มเมื่อไร
 9. เกณฑ์ accuracy ที่ตั้งไว้ (98/95/80) สมจริงกับภาษาไทยที่ไม่เว้นวรรคไหม

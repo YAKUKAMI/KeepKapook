@@ -4,7 +4,9 @@ import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import '../utils/next_goal_offer.dart';
 import '../widgets/celebration.dart';
+import 'new_goal_screen.dart';
 
 class AddSavingScreen extends StatefulWidget {
   final String? presetGoalId;
@@ -98,7 +100,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
           FilledButton(
             onPressed: amountSatang == null || amountSatang <= 0
                 ? null
-                : () {
+                : () async {
                     final res = app.addSaving(
                       amountSatang: amountSatang,
                       goalId: _dest == 'unallocated' ? null : _dest,
@@ -109,7 +111,17 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
                       backgroundColor: AppColors.deepGreen,
                     ));
                     if (res.completed != null) {
-                      showCelebration(context, res.completed!, res.exp);
+                      final nextOffer = app.nextGoalOfferAfter(
+                        <String>{res.completed!.id},
+                      );
+                      final action = await showCelebration(
+                        context,
+                        res.completed!,
+                        res.exp,
+                        nextOffer: nextOffer,
+                      );
+                      if (!context.mounted) return;
+                      await _handleCelebrationAction(app, nextOffer, action);
                     } else {
                       Navigator.pop(context);
                     }
@@ -120,6 +132,62 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
       ),
     );
   }
+
+  Future<void> _handleCelebrationAction(
+    AppState app,
+    NextGoalOffer offer,
+    CelebrationNextAction? action,
+  ) async {
+    switch (action) {
+      case CelebrationNextAction.allocateUnallocated:
+        app.allocateUnallocated(
+          offer.allocatableSatang,
+          offer.goalId!,
+        );
+        _recordNextGoalDecision(accepted: true);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'ย้าย ${formatMoney(offer.allocatableSatang)} '
+              'เข้า ${offer.goalName} แล้ว',
+            ),
+            backgroundColor: AppColors.deepGreen,
+          ),
+        );
+        Navigator.pop(context);
+        return;
+      case CelebrationNextAction.continueGoal:
+        _recordNextGoalDecision(accepted: true);
+        if (!mounted) return;
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => AddSavingScreen(presetGoalId: offer.goalId),
+          ),
+        );
+        return;
+      case CelebrationNextAction.createGoal:
+        _recordNextGoalDecision(accepted: true);
+        if (!mounted) return;
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(builder: (_) => const NewGoalScreen()),
+        );
+        return;
+      case CelebrationNextAction.later:
+        _recordNextGoalDecision(accepted: false);
+        if (!mounted) return;
+        Navigator.pop(context);
+        return;
+      case null:
+        Navigator.pop(context);
+        return;
+    }
+  }
+
+  void _recordNextGoalDecision({required bool accepted}) =>
+      context.read<AppState>().recordNextGoalDecision(accepted: accepted);
 
   Widget _destTile(String label, bool active,
       {VoidCallback? onTap, Widget? trailing}) {

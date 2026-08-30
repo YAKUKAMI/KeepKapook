@@ -242,8 +242,12 @@ class GoalDetailScreen extends StatelessWidget {
             runSpacing: 8,
             children: [
               OutlinedButton(
-                onPressed: () => snack(
-                    'รับภารกิจ! ออมวันละ ${formatMoney(rec.catchUpPerDaySatang)} ${rec.catchUpDays} วัน 💪'),
+                onPressed: () {
+                  app.recordRecoveryPlanUse();
+                  snack(
+                    'รับภารกิจ! ออมวันละ ${formatMoney(rec.catchUpPerDaySatang)} ${rec.catchUpDays} วัน 💪',
+                  );
+                },
                 child: Text(
                     'ออมเพิ่มวันละ ${formatMoney(rec.catchUpPerDaySatang)}'),
               ),
@@ -252,6 +256,7 @@ class GoalDetailScreen extends StatelessWidget {
                   goal.targetDate =
                       goal.targetDate.add(Duration(days: rec.extendDays));
                   app.updateGoal(goal);
+                  app.recordRecoveryPlanUse();
                   snack('เลื่อนวันสำเร็จ +${rec.extendDays} วัน');
                 },
                 child: Text('เลื่อน +${rec.extendDays} วัน'),
@@ -260,6 +265,7 @@ class GoalDetailScreen extends StatelessWidget {
                 onPressed: () {
                   goal.targetSatang = rec.reducedTargetSatang;
                   app.updateGoal(goal);
+                  app.recordRecoveryPlanUse();
                   snack('ลดเป้าเหลือ ${formatMoney(rec.reducedTargetSatang)}');
                 },
                 child:

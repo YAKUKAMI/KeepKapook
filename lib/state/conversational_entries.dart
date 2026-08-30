@@ -90,6 +90,12 @@ extension ConversationalEntryActions on AppState {
               date: item.date.toUtc(),
             ),
           );
+          _recordLoggingMetric(
+            item.date,
+            item.type == ParsedEntryType.expense
+                ? LoggingKind.expense
+                : LoggingKind.other,
+          );
           ledgerEntryIds.add(id);
           user.exp += 5;
         }
@@ -115,6 +121,7 @@ extension ConversationalEntryActions on AppState {
     if (receipt._used) return false;
     receipt._used = true;
     _fromJson(receipt._beforeState);
+    _recordUndoMetric();
     _saveAndNotify();
     return true;
   }
@@ -126,6 +133,7 @@ extension ConversationalEntryActions on AppState {
     required String category,
     required String note,
     required DateTime date,
+    String? parserInput,
   }) {
     final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
     final index = ledger.indexWhere((entry) => entry.id == id);
@@ -139,27 +147,41 @@ extension ConversationalEntryActions on AppState {
       ..category = category
       ..note = note
       ..date = date.toUtc();
+    _recordCorrectionMetric(parserInput: parserInput);
     _refreshHabitRewards(asOf: date);
     _saveAndNotify();
     return true;
   }
 
-  bool updateLedgerCategory(String id, String category) {
+  bool updateLedgerCategory(
+    String id,
+    String category, {
+    String? parserInput,
+  }) {
     final index = ledger.indexWhere((entry) => entry.id == id);
     if (index < 0) {
       throw DomainValidationException.missingEntity('รายการบัญชี', id);
     }
+    if (ledger[index].category == category) return true;
     ledger[index].category = category;
+    _recordCorrectionMetric(parserInput: parserInput);
     _saveAndNotify();
     return true;
   }
 
-  bool updateLedgerDate(String id, DateTime date) {
+  bool updateLedgerDate(
+    String id,
+    DateTime date, {
+    String? parserInput,
+  }) {
     final index = ledger.indexWhere((entry) => entry.id == id);
     if (index < 0) {
       throw DomainValidationException.missingEntity('รายการบัญชี', id);
     }
-    ledger[index].date = date.toUtc();
+    final utcDate = date.toUtc();
+    if (ledger[index].date == utcDate) return true;
+    ledger[index].date = utcDate;
+    _recordCorrectionMetric(parserInput: parserInput);
     _refreshHabitRewards(asOf: date);
     _saveAndNotify();
     return true;
@@ -170,6 +192,7 @@ extension ConversationalEntryActions on AppState {
     required num amountSatang,
     required String note,
     required DateTime date,
+    String? parserInput,
   }) {
     final validatedAmountSatang = validateMoneyAmountSatang(amountSatang);
     final index = transactions.indexWhere((tx) => tx.id == id);
@@ -177,6 +200,11 @@ extension ConversationalEntryActions on AppState {
       throw DomainValidationException.missingEntity('ประวัติเงินออม', id);
     }
     final transaction = transactions[index];
+    final utcDate = date.toUtc();
+    final changed = transaction.amountSatang != validatedAmountSatang ||
+        transaction.note != note ||
+        transaction.date != utcDate;
+    if (!changed) return const HistoryMutationResult.success();
     final deltaSatang = validatedAmountSatang - transaction.amountSatang;
     final adjustment = _applyTransactionDelta(transaction, deltaSatang);
     if (!adjustment.success) return adjustment;
@@ -184,8 +212,9 @@ extension ConversationalEntryActions on AppState {
     transaction
       ..amountSatang = validatedAmountSatang
       ..note = note
-      ..date = date.toUtc();
-    _refreshGoalStatuses(date.toUtc());
+      ..date = utcDate;
+    _recordCorrectionMetric(parserInput: parserInput);
+    _refreshGoalStatuses(utcDate);
     _refreshHabitRewards(asOf: date);
     _saveAndNotify();
     return const HistoryMutationResult.success();

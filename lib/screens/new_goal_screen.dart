@@ -42,23 +42,23 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _pocket,
-              activeThumbColor: AppColors.mint,
-              title: const Text('กระเป๋าใช้จ่าย (ไม่มีเป้าหมาย)'),
-              subtitle: const Text('ยืดหยุ่น เข้า-ออกได้ตลอด',
-                  style: TextStyle(fontSize: 12)),
-              onChanged: (v) => setState(() {
-                _pocket = v;
-                if (v) _emoji = '👛';
-              }),
+          Material(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _pocket,
+                activeThumbColor: AppColors.mint,
+                title: const Text('กระเป๋าใช้จ่าย (ไม่มีเป้าหมาย)'),
+                subtitle: const Text('ยืดหยุ่น เข้า-ออกได้ตลอด',
+                    style: TextStyle(fontSize: 12)),
+                onChanged: (v) => setState(() {
+                  _pocket = v;
+                  if (v) _emoji = '👛';
+                }),
+              ),
             ),
           ),
           const SizedBox(height: 12),

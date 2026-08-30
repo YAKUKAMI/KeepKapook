@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../utils/notification_schedule.dart';
 import '../widgets/notification_settings_card.dart';
+import '../widgets/local_metrics_card.dart';
 import '../widgets/quick_amount_settings.dart';
 import '../widgets/simulation_notice.dart';
 import 'achievements_screen.dart';
@@ -89,6 +90,12 @@ class SettingsScreen extends StatelessWidget {
                 controller: notifications!,
                 goalName: notificationGoalName,
               ),
+            LocalMetricsCard(
+              metrics: app.localMetrics,
+              summary: app.localMetricsSummary(now: DateTime.now()),
+              onCorpusCollectionChanged: app.setParserCorpusCollectionEnabled,
+              onClearCorpus: app.clearParserCorpus,
+            ),
             _section('ทางลัด', [
               ListTile(
                 contentPadding: EdgeInsets.zero,
