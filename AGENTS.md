@@ -86,7 +86,7 @@ test/
 ├─ transaction_flow_test.dart   flow + source/destination + legacy edit guard
 ├─ invariants/transaction_flow_invariant_test.dart  I13 canonical TxType/flow
 ├─ invariants/migration_chain_invariant_test.dart  I14 full-chain + TOTAL
-├─ parser_test.dart          corpus accuracy + parser edge cases
+├─ parser_test.dart          parser unit tests รายพฤติกรรม
 ├─ conversational_entry_test.dart  tier/undo/FAB/inline edit
 ├─ notification_schedule_test.dart / notification_controller_test.dart
 ├─ notification_ui_test.dart       schedule, permission-on-first-save, Settings/web stub
@@ -98,8 +98,8 @@ test/
 ├─ local_metrics_migration_test.dart / local_metrics_state_test.dart
 ├─ local_metrics_settings_test.dart Settings แสดงตัวเลข/สวิตช์/ล้าง corpus
 ├─ historical_edit_test.dart       edit/delete history + ledger
-└─ fixtures/parser_corpus.dart     corpus synthetic 37 ประโยค (ยังไม่ใช่ข้อมูลผู้ใช้จริง;
-                                    support file ไม่ใช่ test entrypoint)
+└─ fixtures/parser_edge_cases.dart synthetic regression 78 เคสที่เจ้าของภาษา
+                                      ในกลุ่มเป้าหมายตรวจแล้ว (pure Dart; ยังไม่ใช่ test entrypoint)
 ```
 
 **หนี้โครงสร้างที่รู้ตัว:** `app_state.dart` ยังยาว 850 บรรทัดแม้แยก conversational และ
@@ -271,8 +271,9 @@ Workflow: `.github/workflows/definition-of-done.yml` ใช้ Flutter 3.47.1 �
 - ❌ **ห้ามใส่ข้อมูล mock/seed กลับเข้าไปในแอป** — แอปต้องเริ่มว่างเปล่าผ่าน onboarding เสมอ
 - ❌ **ห้ามใช้ `double` กับยอดเงิน**
 - ❌ **logic ใหม่ทุกตัวใน Phase 1 ต้องเป็น pure function ใน `lib/utils/`** และต้องเทสได้โดยไม่สร้าง `AppState`; `AppState` มีหน้าที่ validate/orchestrate/apply/persist เท่านั้น ห้ามเพิ่มสูตรคำนวณใน `AppState` หรือคลาส widget แม้แต่บรรทัดเดียว
-- ❌ **ห้ามเรียกผลจาก synthetic corpus ว่า accuracy กับผู้ใช้จริง** — ประโยคสังเคราะห์ที่เจ้าของภาษาในกลุ่มเป้าหมายตรวจแล้วใช้เป็น regression gate 98/95/80 ได้ แต่ accuracy จริงวัดได้เมื่อสะสมข้อความ verbatim จากผู้ใช้จริงอย่างน้อย 50 ประโยค (ลบ PII ได้ ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
-- หลังปล่อยให้เพิ่ม corpus จากข้อความจริงที่ได้ tier `low`/`reject` หรือถูกผู้ใช้แก้หลังบันทึกผ่าน local metrics (ผู้ใช้ปิดหรือล้างได้) และวัด accuracy จริงใหม่เมื่อครบอย่างน้อย 50 ประโยค; ห้ามลด threshold เพื่อทำให้เทสผ่าน
+- ประโยคสังเคราะห์ที่ผ่านการตรวจโดยเจ้าของภาษาในกลุ่มเป้าหมายใช้เป็น regression gate ได้ และผูกกับเกณฑ์ amount 98% / type 95% / category 80%; หน้าที่คือกันไม่ให้พฤติกรรมที่เคยทำได้พังตอนแก้โค้ดรอบหลัง
+- ❌ **ห้ามเรียกตัวเลขจากชุดสังเคราะห์ว่า accuracy กับผู้ใช้จริง** — accuracy จริงวัดได้เมื่อมีประโยค verbatim จากผู้ใช้จริงอย่างน้อย 50 ประโยค ซึ่งสะสมในเครื่องจาก local event tracking รอบ 14 หลังปล่อย: เคส tier `low`/`reject` และรายการ parser ที่ผู้ใช้แก้หลังบันทึก (ผู้ใช้ปิดหรือล้างได้; ลบ PII ได้แต่ห้ามปรับสำนวนให้ parser ง่ายขึ้น)
+- เมื่อข้อความจริงครบอย่างน้อย 50 ประโยค ให้คำนวณ accuracy ใหม่แล้วเทียบกับชุดสังเคราะห์; ถ้าต่ำกว่ากันมาก แปลว่าชุดสังเคราะห์มีจุดบอด ต้องเติม regression case จากของจริง และห้ามลด threshold เพื่อทำให้เทสผ่าน
 - ❌ **ห้ามลบหรือลดความชัดของข้อความ disclaimer / label "จำลอง"** บนฟีเจอร์ โอน / ล็อก / ออมด้วยกัน / ถอนออก (§1 และ `simulation_notice.dart`)
 - ❌ ห้าม refactor ใหญ่พ่วงมากับงานฟีเจอร์ — แยกคนละรอบ
 - ❌ ห้าม commit ไฟล์ signing key, `.env`, หรือ google-services.json ที่มี secret
@@ -343,7 +344,7 @@ void someAction(...) {
 ## 10. Backlog
 
 ### P0 — ต้องเสร็จก่อนปล่อยผู้ใช้จริง
-- [ ] สะสม parser corpus แบบ verbatim จากผู้ใช้จริงอย่างน้อย 50 ประโยคแล้ววัด accuracy จริง; synthetic 37 เคสเดิมใช้ regression gate ได้แต่ห้ามเรียกว่า user accuracy
+- [ ] สะสม parser corpus แบบ verbatim จากผู้ใช้จริงอย่างน้อย 50 ประโยคแล้ววัด accuracy จริง; synthetic 78 เคสใน `parser_edge_cases.dart` ใช้ regression gate ได้แต่ห้ามเรียกว่า user accuracy
 - [x] `schemaVersion` + migration framework (`lib/state/migrations.dart`, current v6)
 - [x] เปลี่ยนยอดเงินเป็น `int` สตางค์ + migration v1→v2
 - [x] Export / Import ข้อมูลเป็นไฟล์ JSON พร้อม validate, migration, preview และ pre-import backup

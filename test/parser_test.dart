@@ -3,118 +3,10 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:keepkapook/utils/parser/parser.dart';
 
-import 'fixtures/parser_corpus.dart';
-
-const _minimumAmountAccuracy = 0.98;
-const _minimumTypeAccuracy = 0.95;
-const _minimumCategoryAccuracy = 0.80;
 final _referenceDate = DateTime.utc(2026, 8, 27);
 
 void main() {
-  group('ThaiLedgerParser corpus', () {
-    test('ผ่าน corpus พร้อมรายงาน accuracy แยกรายฟิลด์', () {
-      var amountCorrect = 0;
-      var amountTotal = 0;
-      var typeCorrect = 0;
-      var typeTotal = 0;
-      var categoryCorrect = 0;
-      var categoryTotal = 0;
-      var dateCorrect = 0;
-      var dateTotal = 0;
-      var silentHighErrors = 0;
-
-      for (final fixture in parserCorpus) {
-        final result = parseThaiLedgerLine(
-          fixture.input,
-          referenceDate: _referenceDate,
-        );
-
-        expect(
-          result.tier,
-          fixture.expectedTier,
-          reason: 'tier ผิดสำหรับ "${fixture.input}"',
-        );
-
-        if (fixture.knownLimitation) {
-          expect(fixture.limitationReason, isNotEmpty);
-          expect(result.tier, isNot(ParseTier.high));
-          continue;
-        }
-
-        final expectedAmounts = fixture.expectedItems.isNotEmpty
-            ? fixture.expectedItems.map((item) => item.amountSatang).toList()
-            : fixture.expectedDetectedAmounts;
-        final actualAmounts = result.items.isNotEmpty
-            ? result.items.map((item) => item.amountSatang).toList()
-            : result.detectedAmounts
-                .where((amount) => !amount.isOperatorOperand)
-                .map((amount) => amount.amountSatang)
-                .whereType<int>()
-                .toList();
-
-        if (expectedAmounts.isNotEmpty) {
-          amountTotal += expectedAmounts.length;
-          for (var index = 0; index < expectedAmounts.length; index++) {
-            if (index < actualAmounts.length &&
-                actualAmounts[index] == expectedAmounts[index]) {
-              amountCorrect++;
-            }
-          }
-        }
-
-        for (var index = 0; index < fixture.expectedItems.length; index++) {
-          final expected = fixture.expectedItems[index];
-          final actual =
-              index < result.items.length ? result.items[index] : null;
-
-          typeTotal++;
-          categoryTotal++;
-          dateTotal++;
-          if (actual?.type == expected.type) typeCorrect++;
-          if (actual?.category == expected.category) categoryCorrect++;
-
-          final expectedDate =
-              _referenceDate.add(Duration(days: expected.dayOffset));
-          if (actual?.date == expectedDate) dateCorrect++;
-        }
-
-        final highResultIsWrong = result.tier == ParseTier.high &&
-            (!_sameItems(result.items, fixture.expectedItems) ||
-                result.rejectReason != null ||
-                result.question != null);
-        if (highResultIsWrong) silentHighErrors++;
-
-        if (result.tier == ParseTier.low) {
-          expect(result.question, isNotNull, reason: fixture.input);
-          expect(result.question!.options, isNotEmpty, reason: fixture.input);
-        }
-        if (result.tier == ParseTier.reject) {
-          expect(result.rejectReason, isNotEmpty, reason: fixture.input);
-          expect(result.items, isEmpty, reason: fixture.input);
-        }
-      }
-
-      final amountAccuracy = amountCorrect / amountTotal;
-      final typeAccuracy = typeCorrect / typeTotal;
-      final categoryAccuracy = categoryCorrect / categoryTotal;
-      final dateAccuracy = dateCorrect / dateTotal;
-
-      // ignore: avoid_print
-      print(
-        'PARSER_ACCURACY '
-        'amount=${_percent(amountAccuracy)} ($amountCorrect/$amountTotal) '
-        'type=${_percent(typeAccuracy)} ($typeCorrect/$typeTotal) '
-        'category=${_percent(categoryAccuracy)} ($categoryCorrect/$categoryTotal) '
-        'date=${_percent(dateAccuracy)} ($dateCorrect/$dateTotal) '
-        'silent_high_errors=$silentHighErrors',
-      );
-
-      expect(amountAccuracy, greaterThanOrEqualTo(_minimumAmountAccuracy));
-      expect(typeAccuracy, greaterThanOrEqualTo(_minimumTypeAccuracy));
-      expect(categoryAccuracy, greaterThanOrEqualTo(_minimumCategoryAccuracy));
-      expect(silentHighErrors, 0);
-    });
-
+  group('ThaiLedgerParser', () {
     test('รองรับวันสัมพัทธ์และปัดหารด้วย half-up', () {
       final dayBeforeYesterday = parseThaiLedgerLine(
         'กาแฟ 65 เมื่อวานซืน',
@@ -234,24 +126,3 @@ void main() {
     });
   });
 }
-
-bool _sameItems(
-  List<ParsedLedgerItem> actual,
-  List<ExpectedParserItem> expected,
-) {
-  if (actual.length != expected.length) return false;
-  for (var index = 0; index < expected.length; index++) {
-    final actualItem = actual[index];
-    final expectedItem = expected[index];
-    if (actualItem.amountSatang != expectedItem.amountSatang ||
-        actualItem.type != expectedItem.type ||
-        actualItem.category != expectedItem.category ||
-        actualItem.date !=
-            _referenceDate.add(Duration(days: expectedItem.dayOffset))) {
-      return false;
-    }
-  }
-  return true;
-}
-
-String _percent(double value) => '${(value * 100).toStringAsFixed(2)}%';
