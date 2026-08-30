@@ -329,6 +329,17 @@ class _ConversationalEntrySheetState extends State<ConversationalEntrySheet> {
       referenceDate: DateTime.now(),
       availableGoalNames: activeGoals.map((goal) => goal.name).toList(),
     );
+    final goalItems = result.items
+        .where((item) => item.type == ParsedEntryType.goalDeposit)
+        .toList();
+    final effectiveTier = switch ((result.tier, goalItems.isNotEmpty)) {
+      (ParseTier.high || ParseTier.medium, true) when activeGoals.isEmpty =>
+        ParseTier.reject,
+      (ParseTier.high || ParseTier.medium, true) when activeGoals.length > 1 =>
+        ParseTier.low,
+      _ => result.tier,
+    };
+    app.recordQuickEntryResult(effectiveTier, input);
     setState(() {
       _result = result;
       _message = null;
@@ -337,9 +348,6 @@ class _ConversationalEntrySheetState extends State<ConversationalEntrySheet> {
     });
 
     if (result.tier == ParseTier.high || result.tier == ParseTier.medium) {
-      final goalItems = result.items
-          .where((item) => item.type == ParsedEntryType.goalDeposit)
-          .toList();
       if (goalItems.isNotEmpty) {
         if (activeGoals.isEmpty) {
           setState(() =>
@@ -518,7 +526,11 @@ class _ConversationalEntrySheetState extends State<ConversationalEntrySheet> {
   void _changeCategory(String category) {
     final id = _editableLedgerId;
     if (id == null) return;
-    if (context.read<AppState>().updateLedgerCategory(id, category)) {
+    if (context.read<AppState>().updateLedgerCategory(
+          id,
+          category,
+          parserInput: _controller.text.trim(),
+        )) {
       setState(() => _selectedCategory = category);
     }
   }
@@ -538,7 +550,11 @@ class _ConversationalEntrySheetState extends State<ConversationalEntrySheet> {
     final app = context.read<AppState>();
     var updated = false;
     if (_editableLedgerId != null) {
-      updated = app.updateLedgerDate(_editableLedgerId!, date);
+      updated = app.updateLedgerDate(
+        _editableLedgerId!,
+        date,
+        parserInput: _controller.text.trim(),
+      );
     } else if (_editableTransactionId != null) {
       final transaction = app.transactions
           .where((tx) => tx.id == _editableTransactionId)
@@ -550,6 +566,7 @@ class _ConversationalEntrySheetState extends State<ConversationalEntrySheet> {
               amountSatang: transaction.amountSatang,
               note: transaction.note,
               date: date,
+              parserInput: _controller.text.trim(),
             )
             .success;
       }

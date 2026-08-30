@@ -1,7 +1,8 @@
 import '../models/models.dart';
 import '../utils/format.dart';
+import '../utils/local_metrics.dart';
 
-const int currentSchemaVersion = 5;
+const int currentSchemaVersion = 6;
 
 typedef StateMigration = Map<String, dynamic> Function(
   Map<String, dynamic> state,
@@ -13,6 +14,7 @@ final Map<int, StateMigration> _migrationSteps = <int, StateMigration>{
   2: _migrateV2ToV3,
   3: _migrateV3ToV4,
   4: _migrateV4ToV5,
+  5: _migrateV5ToV6,
 };
 
 Map<String, dynamic> _migrateV1ToV2(Map<String, dynamic> state) {
@@ -219,6 +221,67 @@ Map<String, dynamic> _migrateV4ToV5(Map<String, dynamic> state) {
   );
   return migrated;
 }
+
+Map<String, dynamic> _migrateV5ToV6(Map<String, dynamic> state) {
+  final migrated = Map<String, dynamic>.from(state);
+  final goals = _jsonObjectsForMetrics(state['goals'], 'goals');
+  final transactions =
+      _jsonObjectsForMetrics(state['transactions'], 'transactions');
+  final ledger = _jsonObjectsForMetrics(state['ledger'], 'ledger');
+
+  final timestamps = <DateTime>[
+    for (final goal in goals)
+      if (_tryDate(goal['startDate']) case final date?) date,
+    for (final transaction in transactions)
+      if (_tryDate(transaction['date']) case final date?) date,
+    for (final entry in ledger)
+      if (_tryDate(entry['date']) case final date?) date,
+  ]..sort();
+  final earliest = timestamps.firstOrNull;
+  var metrics = earliest == null
+      ? LocalMetrics.fromJson(const <String, dynamic>{})
+      : LocalMetrics.empty(installedAt: earliest);
+
+  for (final transaction in transactions) {
+    if (transaction['flow']?.toString() != 'externalIn') continue;
+    final date = _tryDate(transaction['date']);
+    if (date == null) continue;
+    metrics = recordLoggingActivity(
+      metrics,
+      occurredAt: date,
+      kind: LoggingKind.saving,
+    );
+  }
+  for (final entry in ledger) {
+    final date = _tryDate(entry['date']);
+    if (date == null) continue;
+    metrics = recordLoggingActivity(
+      metrics,
+      occurredAt: date,
+      kind: entry['type']?.toString() == 'expense'
+          ? LoggingKind.expense
+          : LoggingKind.other,
+    );
+  }
+  migrated['metrics'] = metrics.toJson();
+  return migrated;
+}
+
+List<Map<String, dynamic>> _jsonObjectsForMetrics(
+  Object? value,
+  String fieldName,
+) {
+  if (value == null) return <Map<String, dynamic>>[];
+  if (value is! List) throw FormatException('$fieldName ต้องเป็น JSON array');
+  return value.map((entry) {
+    if (entry is! Map) {
+      throw FormatException('ข้อมูล $fieldName ต้องเป็น JSON object');
+    }
+    return Map<String, dynamic>.from(entry);
+  }).toList(growable: false);
+}
+
+DateTime? _tryDate(Object? value) => DateTime.tryParse(value?.toString() ?? '');
 
 List<Map<String, dynamic>> _filterJsonObjects(
   Object? value, {

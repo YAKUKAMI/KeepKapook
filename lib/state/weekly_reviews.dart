@@ -25,6 +25,7 @@ extension WeeklyReviewState on AppState {
 
   void completeWeeklyReview() {
     _progressQuest('q-weekly-review');
+    _recordWeeklyReviewMetric();
     _saveAndNotify();
   }
 }

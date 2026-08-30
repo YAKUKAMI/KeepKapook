@@ -91,6 +91,7 @@ extension QuickEntryActions on AppState {
     if (receipt._used) return false;
     receipt._used = true;
     _fromJson(receipt._beforeState);
+    _recordUndoMetric();
     _saveAndNotify();
     return true;
   }

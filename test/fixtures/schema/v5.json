@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 5,
+  "user": {
+    "name": "ผู้ใช้ v5",
+    "emoji": "🐷",
+    "exp": 525,
+    "consistencyWeeks": 6,
+    "mode": "adult",
+    "onboarded": true
+  },
+  "goals": [
+    {
+      "id": "v5-goal",
+      "name": "เรียนต่อ",
+      "description": "",
+      "targetSatang": 300000,
+      "currentSatang": 45000,
+      "startDate": "2026-01-01T00:00:00.000Z",
+      "targetDate": "2026-12-01T00:00:00.000Z",
+      "category": "education",
+      "priority": "high",
+      "emoji": "📚",
+      "themeColor": 4283615141,
+      "status": "active",
+      "completedDate": null,
+      "flexible": false,
+      "locked": false,
+      "lockUntil": null,
+      "shared": false,
+      "members": [],
+      "highestMilestonePercent": 0
+    }
+  ],
+  "transactions": [
+    {
+      "id": "v5-saving",
+      "type": "deposit",
+      "flow": "externalIn",
+      "amountSatang": 45000,
+      "date": "2026-01-08T00:00:00.000Z",
+      "goalId": null,
+      "destinationGoalId": "v5-goal",
+      "sourceGoalNameSnapshot": null,
+      "destinationGoalNameSnapshot": "เรียนต่อ",
+      "note": "",
+      "expAwarded": 10,
+      "isPossibleDuplicate": false
+    }
+  ],
+  "quests": [
+    {
+      "id": "q-deposit",
+      "title": "บันทึกเงินออม",
+      "description": "เพิ่มเงินเข้ากระปุกวันนี้",
+      "period": "daily",
+      "target": 1,
+      "progress": 1,
+      "expReward": 15,
+      "claimed": false
+    }
+  ],
+  "badges": [
+    {
+      "id": "b-first-drop",
+      "name": "First Drop",
+      "description": "ออมครั้งแรก",
+      "emoji": "💧",
+      "condition": "บันทึกเงินออมครั้งแรก",
+      "unlocked": true,
+      "progress": 1.0
+    }
+  ],
+  "ledger": [
+    {
+      "id": "v5-expense",
+      "type": "expense",
+      "amountSatang": 7500,
+      "category": "อาหาร",
+      "note": "",
+      "date": "2026-01-22T00:00:00.000Z"
+    }
+  ],
+  "unallocatedSatang": 5000
+}
