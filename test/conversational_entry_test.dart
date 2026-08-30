@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:keepkapook/models/models.dart';
 import 'package:keepkapook/main.dart';
-import 'package:keepkapook/screens/dashboard_screen.dart';
 import 'package:keepkapook/state/app_state.dart';
 import 'package:keepkapook/theme/app_theme.dart';
+import 'package:keepkapook/widgets/conversational_entry_sheet.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -52,24 +52,34 @@ void main() {
   }
 
   Widget wrap(AppState app) => MaterialApp(
-        theme: buildAppTheme(),
-        home: ChangeNotifierProvider<AppState>.value(
-          value: app,
-          child: const Scaffold(body: DashboardScreen()),
+    theme: buildAppTheme(),
+    home: ChangeNotifierProvider<AppState>.value(
+      value: app,
+      child: Scaffold(
+        body: Builder(
+          builder: (context) => Center(
+            child: FilledButton(
+              key: const Key('open-conversational-entry'),
+              onPressed: () async {
+                await showConversationalEntrySheet(context);
+              },
+              child: const Text('เปิดช่องพิมพ์'),
+            ),
+          ),
         ),
-      );
+      ),
+    ),
+  );
 
   Future<void> openInput(WidgetTester tester) async {
-    await tester.tap(find.text('พิมพ์บันทึกรายการ'));
+    await tester.tap(find.byKey(const Key('open-conversational-entry')));
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('conversational_entry_input')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('conversational_entry_input')), findsOneWidget);
   }
 
-  testWidgets('high บันทึกทันทีและ undo คืนยอด EXP quest และ badge ครบ',
-      (tester) async {
+  testWidgets('high บันทึกทันทีและ undo คืนยอด EXP quest และ badge ครบ', (
+    tester,
+  ) async {
     final app = createReadyApp();
     await tester.pumpWidget(wrap(app));
 
@@ -155,8 +165,9 @@ void main() {
     await app.flushPendingSaves();
   });
 
-  testWidgets('medium บันทึกทันทีและเปลี่ยนหมวดในบรรทัดเดิมได้',
-      (tester) async {
+  testWidgets('medium บันทึกทันทีและเปลี่ยนหมวดในบรรทัดเดิมได้', (
+    tester,
+  ) async {
     final app = createReadyApp();
     await tester.pumpWidget(wrap(app));
 
@@ -181,8 +192,9 @@ void main() {
     await app.flushPendingSaves();
   });
 
-  testWidgets('medium ที่วันที่ไม่ชัดแสดง chip วันที่ให้แก้ในบรรทัดเดิม',
-      (tester) async {
+  testWidgets('medium ที่วันที่ไม่ชัดแสดง chip วันที่ให้แก้ในบรรทัดเดิม', (
+    tester,
+  ) async {
     final app = createReadyApp();
     await tester.pumpWidget(wrap(app));
 
@@ -213,10 +225,7 @@ void main() {
     expect(find.byTooltip('บันทึกเร็ว'), findsOneWidget);
     await tester.tap(find.byTooltip('บันทึกเร็ว'));
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('quick-saving-5000')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('quick-saving-5000')), findsOneWidget);
     expect(find.text('ภาพรวม'), findsOneWidget);
   });
 }
