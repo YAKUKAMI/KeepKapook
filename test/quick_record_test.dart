@@ -197,6 +197,29 @@ void main() {
     expect(find.text('ยอดออม 7 วันล่าสุด'), findsNothing);
   });
 
+  testWidgets('dashboard บอกชัดเมื่อไม่มีกระปุกที่กำลังออม', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 3200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final app = readyApp()..goals.single.status = GoalStatus.completed;
+    final quickEntries = await readyQuickController();
+    await tester.pumpWidget(
+      wrap(
+        app: app,
+        quickEntries: quickEntries,
+        child: const DashboardScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dashboard-empty-goals')), findsOneWidget);
+    expect(find.text('ไม่มีกระปุกที่กำลังออมแล้ว'), findsOneWidget);
+    expect(find.text('สร้างกระปุกใหม่'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const Key('dashboard-empty-goals'))).dy,
+      lessThan(tester.getTopLeft(find.text('สตรีคการบันทึก')).dy),
+    );
+  });
+
   testWidgets('หลายกระปุกเลือกปลายทางและจำนวนใน bottom sheet เดียว', (
     tester,
   ) async {

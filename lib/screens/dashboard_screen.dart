@@ -11,6 +11,7 @@ import 'goal_detail_screen.dart';
 import 'add_saving_screen.dart';
 import 'scan_slip_screen.dart';
 import 'ledger_screen.dart';
+import 'new_goal_screen.dart';
 import 'weekly_review_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -255,20 +256,60 @@ class DashboardScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
         const SizedBox(height: 12),
-        ...app.activeGoals.map(
-          (g) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: GoalCard(
-              goal: g,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => GoalDetailScreen(goalId: g.id),
+        if (app.activeGoals.isEmpty) ...[
+          KeyedSubtree(
+            key: const Key('dashboard-empty-goals'),
+            child: _card(
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.savings_outlined,
+                    size: 36,
+                    color: AppColors.mint,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'ไม่มีกระปุกที่กำลังออมแล้ว',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'สร้างกระปุกใหม่เพื่อเริ่มเป้าหมายถัดไปได้เลย',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.mutedText,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const NewGoalScreen()),
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('สร้างกระปุกใหม่'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ] else
+          ...app.activeGoals.map(
+            (g) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GoalCard(
+                goal: g,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => GoalDetailScreen(goalId: g.id),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         const SizedBox(height: 4),
 
         HabitCalendarCard(
