@@ -353,8 +353,8 @@ void someAction(...) {
 - [x] Unit test ของ money parser/format, เพดาน, `coach.dart`, โอน, overflow, edit/delete และยอดรวมไม่เพี้ยน
 - [ ] เพิ่ม unit test ที่ยังขาด: EXP/level boundary, lock และ withdraw โดยตรง
 - [x] `applicationId` / bundle id เป็น `com.keepkapook` + app icon Android/iOS/web
-- [x] `flutter build apk --release` เคยผ่าน (ปัจจุบันยังเซ็นด้วย debug certificate)
-- [ ] ทำ release signing/upload key จริง ห้าม commit secret/keystore
+- [x] `flutter build apk --release` ผ่านและเซ็นด้วย KeepKapook release certificate จริง
+- [x] ทำ release signing key จริง เก็บ keystore/รหัสไว้นอก repository และ ignore `android/key.properties`
 - [ ] Privacy policy + นโยบายรูปสลิป (มี PII: เลขบัญชี/ชื่อ) — ไม่อัปโหลดออกนอกเครื่อง, ขอ permission ให้ถูก
 
 ### P1 — ฟีเจอร์ที่ควรมี เรียงตามผลต่อ retention
