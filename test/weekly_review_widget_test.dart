@@ -106,6 +106,12 @@ void main() {
       _host(app, Scaffold(body: DashboardScreen(now: _now))),
     );
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('weekly-review-launcher')),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pump();
     expect(find.byKey(const Key('weekly-review-launcher')), findsOneWidget);
     expect(find.text('สรุปสัปดาห์พร้อมแล้ว'), findsOneWidget);
     await tester.tap(find.byKey(const Key('weekly-review-launcher')));

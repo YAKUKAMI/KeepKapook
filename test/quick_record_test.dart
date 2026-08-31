@@ -118,12 +118,32 @@ void main() {
       wrap(
         app: app,
         quickEntries: quickEntries,
-        child: const DashboardScreen(),
+        child: Builder(
+          builder: (context) => Stack(
+            children: [
+              const DashboardScreen(),
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: FloatingActionButton(
+                  key: const Key('open-quick-record'),
+                  onPressed: () async {
+                    await showQuickRecordSheet(
+                      context,
+                      initialMode: QuickRecordInitialMode.expense,
+                    );
+                  },
+                  child: const Icon(Icons.bolt),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+    await tester.pump();
 
-    await tester.ensureVisible(find.byKey(const Key('quick-expense-launcher')));
-    await tester.tap(find.byKey(const Key('quick-expense-launcher')));
+    await tester.tap(find.byKey(const Key('open-quick-record')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('quick-expense-amount')),
@@ -147,8 +167,39 @@ void main() {
     await app.flushPendingSaves();
   });
 
-  testWidgets('หลายกระปุกเลือกปลายทางและจำนวนใน bottom sheet เดียว',
-      (tester) async {
+  testWidgets('dashboard เรียงข้อมูลหลักตามลำดับและไม่มีการ์ดที่ถอดออก', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 3200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final app = readyApp();
+    final quickEntries = await readyQuickController();
+    await tester.pumpWidget(
+      wrap(
+        app: app,
+        quickEntries: quickEntries,
+        child: const DashboardScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final positions = <double>[
+      tester.getTopLeft(find.text('เมย์')).dy,
+      tester.getTopLeft(find.text('รายรับ-รายจ่ายเดือนนี้')).dy,
+      tester.getTopLeft(find.text('ยอดออมรวม')).dy,
+      tester.getTopLeft(find.text('กระปุกกำลังออม')).dy,
+      tester.getTopLeft(find.text('กระปุกของฉัน')).dy,
+      tester.getTopLeft(find.text('สตรีคการบันทึก')).dy,
+    ];
+    expect(positions, orderedEquals(positions.toList()..sort()));
+    expect(find.byKey(const Key('quick-saving-launcher')), findsNothing);
+    expect(find.text('พิมพ์บันทึกรายการ'), findsNothing);
+    expect(find.text('ยอดออม 7 วันล่าสุด'), findsNothing);
+  });
+
+  testWidgets('หลายกระปุกเลือกปลายทางและจำนวนใน bottom sheet เดียว', (
+    tester,
+  ) async {
     final app = readyApp()
       ..goals.add(
         Goal(
@@ -203,14 +254,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('edit-quick-amounts')));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('quick-amount-input-0')),
-      '25',
-    );
-    await tester.enterText(
-      find.byKey(const Key('quick-amount-input-1')),
-      '75',
-    );
+    await tester.enterText(find.byKey(const Key('quick-amount-input-0')), '25');
+    await tester.enterText(find.byKey(const Key('quick-amount-input-1')), '75');
     await tester.enterText(
       find.byKey(const Key('quick-amount-input-2')),
       '200',
