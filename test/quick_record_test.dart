@@ -220,6 +220,58 @@ void main() {
     );
   });
 
+  for (final testCase in <({
+    String name,
+    Key launcherKey,
+    LedgerType type,
+    String expectedSummary,
+  })>[
+    (
+      name: 'รายรับ',
+      launcherKey: const Key('dashboard-quick-income'),
+      type: LedgerType.income,
+      expectedSummary: 'รับ ฿1,500 · จ่าย ฿0',
+    ),
+    (
+      name: 'รายจ่าย',
+      launcherKey: const Key('dashboard-quick-expense'),
+      type: LedgerType.expense,
+      expectedSummary: 'รับ ฿0 · จ่าย ฿1,500',
+    ),
+  ]) {
+    testWidgets('dashboard บันทึก${testCase.name}ได้ในสองครั้งแตะ', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final app = readyApp();
+      final quickEntries = await readyQuickController();
+      await tester.pumpWidget(
+        wrap(
+          app: app,
+          quickEntries: quickEntries,
+          child: const DashboardScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(testCase.launcherKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('ledger-entry-amount')),
+        '1500',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('ledger-entry-save')));
+      await tester.pumpAndSettle();
+
+      expect(app.ledger.single.type, testCase.type);
+      expect(app.ledger.single.amountSatang, 150000);
+      expect(find.text(testCase.expectedSummary), findsOneWidget);
+      await app.flushPendingSaves();
+    });
+  }
+
   testWidgets('หลายกระปุกเลือกปลายทางและจำนวนใน bottom sheet เดียว', (
     tester,
   ) async {

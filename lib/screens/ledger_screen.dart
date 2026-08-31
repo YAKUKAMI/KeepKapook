@@ -25,7 +25,7 @@ class LedgerScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.mint,
-        onPressed: () => _addDialog(context, app),
+        onPressed: () => showEntrySheet(context, app),
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('บันทึก', style: TextStyle(color: Colors.white)),
       ),
@@ -142,11 +142,18 @@ class LedgerScreen extends StatelessWidget {
         ),
       );
 
-  void _addDialog(BuildContext context, AppState app) {
-    LedgerType type = LedgerType.expense;
+  static void showEntrySheet(
+    BuildContext context,
+    AppState app, {
+    LedgerType initialType = LedgerType.expense,
+  }) {
+    LedgerType type = initialType;
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    String category = expenseCategories.first;
+    String category = (type == LedgerType.income
+            ? incomeCategories
+            : expenseCategories)
+        .first;
 
     showModalBottomSheet(
       context: context,
@@ -187,7 +194,9 @@ class LedgerScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               TextField(
+                key: const Key('ledger-entry-amount'),
                 controller: amountCtrl,
+                autofocus: true,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 onChanged: (_) => setLocal(() {}),
@@ -222,6 +231,7 @@ class LedgerScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
+                  key: const Key('ledger-entry-save'),
                   onPressed: (parseMoneyToSatang(amountCtrl.text) ?? 0) <= 0
                       ? null
                       : () {
