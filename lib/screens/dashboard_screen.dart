@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/financial_summary.dart';
@@ -102,7 +103,7 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ),
                       icon: const Icon(Icons.add, size: 18),
-                      label: const Text('เพิ่มเงิน'),
+                      label: const Text('เพิ่มเงินออม'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -144,39 +145,76 @@ class DashboardScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const LedgerScreen()),
           ),
           child: _card(
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'รายรับ-รายจ่ายเดือนนี้',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'รายรับ-รายจ่ายเดือนนี้',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'คงเหลือ ${formatMoney(money.month.netSatang)}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.deepGreen,
+                            ),
+                          ),
+                          Text(
+                            'รับ ${formatMoney(money.month.incomeSatang)} · จ่าย ${formatMoney(money.month.expenseSatang)}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.mutedText,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'คงเหลือ ${formatMoney(money.month.netSatang)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.deepGreen,
-                        ),
-                      ),
-                      Text(
-                        'รับ ${formatMoney(money.month.incomeSatang)} · จ่าย ${formatMoney(money.month.expenseSatang)}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.mutedText,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: AppColors.mutedText,
+                    ),
+                  ],
                 ),
-                const Icon(Icons.chevron_right, color: AppColors.mutedText),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('dashboard-quick-income'),
+                        onPressed: () => LedgerScreen.showEntrySheet(
+                          context,
+                          app,
+                          initialType: LedgerType.income,
+                        ),
+                        icon: const Icon(Icons.add_circle_outline, size: 18),
+                        label: const Text('รายรับ'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('dashboard-quick-expense'),
+                        onPressed: () => LedgerScreen.showEntrySheet(
+                          context,
+                          app,
+                          initialType: LedgerType.expense,
+                        ),
+                        icon: const Icon(Icons.remove_circle_outline, size: 18),
+                        label: const Text('รายจ่าย'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
