@@ -1,5 +1,7 @@
 # 🐷 KeepKapook — Flutter
 
+> เอกสารระบบฉบับละเอียด: [docs/README.md](docs/README.md)
+
 เวอร์ชัน native (iOS/Android) ของ KeepKapook พอร์ตจากเว็บ (Next.js) — **Phase 1**
 
 ## สถานะ (Phase 1 + 2 — compile ผ่าน `flutter build web`)
